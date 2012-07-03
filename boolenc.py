@@ -377,16 +377,16 @@ def findPermLength(N):
 
 
 def findLog(A, p):
-    i = 0
     K = A**1024
     M = K.copy()
     t = {}
-    print "populating rainbow table"
+    print "populating table"
     foundCollision = False
     for i in range(1024):
-        if not foundCollision and M.toTuple() in t:
-            print "Found collision while building table", (i+1)*1024, t[M.toTuple()]
-            foundCollision = True
+        if M.toTuple() in t:
+            if not foundCollision:
+                print "Found collision while building table", (i+1)*1024, t[M.toTuple()]
+                foundCollision = True
         else:
             t[M.toTuple()] = 1024*(i+1)
         M *= K

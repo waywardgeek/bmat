@@ -1,0 +1,165 @@
+|1 0| |x|
+|0 1| |y| = 0
+
+x = 0
+y = 0
+
+Expected number of collision going from N to 2N bits using random functions:
+
+C ~= 2^N*(2^N)*(1/2^2N)/2 ~= 1/2
+
+More exact: probability of any 2 outputs being the same is 1/2^2N.  Total pairs to consider is 2^N choose 2:
+
+C = (1/2^2N)*2^N*(2^N - 1)/2
+  = (1/2^N)*(2^N - 1)/2
+  = (1 - 1/2^N)/2 ~= 1/2
+
+If choosing 2N random output functions of K of the N inputs, what's the likelyhood that every given input can be determined by the 2K output functions?
+
+F[1..2K] = 
+
+Basic scheme: N inputs X[i] scrambled somewhat randomly to 2N intermediate nodes with 2N functions F[i].  Then somewhat random function of 2N inputs scrambles down as low as possible, preferably N outputs with function G[i].  Give the output, there are many values of F that can generate it, but only one value of F that can be generated from X which will then generate the correct output.  Public key is F and G, private key is F'(G'), where F' and G' are inverse functions.
+
+The trick is generating F' and G' at the same time as F and G, while keeping F and G highly random and impractical to invert.  We'll try building F' and G' together with F and G, and hide how we built them.
+
+A set of N functions F[i] is a permutation when
+
+    (X1 = X2) = (F[X1] = F[X2])
+
+reduces to 1.  Rewriting:
+
+*(X1 + X2 + 1) + *(F[X1] + F[X2] + 1) + 1
+
+The first part generates all possible cubes involving X1 and X2.  So, the second part needs to also generate them all.
+
+Two variable case: Let a = X1[0], b = X1[1], A = X2[0], B = X2[1],  f = F[0] = a, g = F[1] = ab:
+
+(a + A + 1)(b + B + 1) + (a + A + 1)(ab + AB + 1) + 1
+ab + aB + a + Ab + AB + A + b + B + 1 +
+    ab + aAB + a + aAb + AB + A + ab + AB + 1 + 1
+ab + aB + a + Ab + AB + A + b + B +
+    aAB + a + aAb + A + 1
+ab + aB + Ab + AB + b + B +
+    aAB + aAb + 1
+
+Note that b did not show up by itself anywhere in (a + A + 1)(ab + AB + 1).  Thus it's not a permutation.  Each variable of the input must show up by itself in at least one factor.  Secondly, we have terms including aA, which are not allowed.  Any two factors when multiplied together cannot have any cubes with both an X1 and X2 version of a variable.
+
+Try f = a, g = a + b:
+
+(a + A + 1)(b + B + 1) + (a + A + 1)(a + b + A + B + 1) + 1
+ab + aB + a + Ab + AB + A + b + B + 1 +
+       a + ab + aA + aB + a + aA + Ab + A + AB + A + a + b + A + B + 1 + 1
+ab + aB + a + Ab + AB + A + b + B
+       a + ab + aB + Ab + A + AB + b + B + 1
+
+Note that the factor (a + b + A + B + 1) = ((a + A) + (b + B + 1).  The (a + A) portion when mutiplied with (a + A + 1) is zero.
+
+When we XOR in a random function of other outputs into an output, it's still a permutation:
+
+fk' = fk + R(fl, fm, fn... != fk])
+
+(fk(X1) + R(fn(X1)) + fk(X2) + R(fn(X2)))
+
+If F is a permutation, then Xoring any function of the F functions other than fi into fi is still a permutation:
+
+((fi(X1) + g(F[j!=i](X1)) + (fi(X2) + g(F[j!=i](X2)) + 1 
+
+((fi(X1) + fi(X2) + 1) + (g(F[j!=i](X1)) + (g(F[j!=i](X2))
+
+The first part is the same term as before xoring in, so multiplying with the rest results in the original function.  The second part when multiplied out is zero when F[j!=i](X1) = F[j!=i](X2), and when they are not equal, at position k, then the term (fk(X1) + fk(X2) + 1) will be zero.
+
+Let's try addition mod 4, for a0 and a1 variables, and b0 and b1 fixed.  s0 = a0 + b0, s1 = a1 + b1 + a0*b0
+
+(a0 + b0 + A0 + b0 + 1)(a1 + b1 + a0*b0 + A1 + b1 + A0*b0 + 1)
+(a0 + A0 + 1)(a1 + A1 + 1 + a0*b0 + A0*b0)
+(a0 + A0 + 1)((a1 + A1 + 1) + b0(a0 + A0))
+
+Yep.  It works.  What else works?  Another point is the a0A0 terms cancel because they had only one variable in each term.  If there were two variables, say A0*B0 anywhere, and a0 and A1 in some other factor, they would not cancel.
+
+All functions of permutations must be balanced.  That also makes ab a non-starter.
+
+000
+100
+010
+110
+001
+101
+011
+111
+
+(f(X1) + f(X2) + 1)(g(X1) + g(X2) + 1)
+    = f(X1)g(X1) + f(X1)g(X2) + f(X1) + f(X2)*g(X1) + f(X2)*g(X2) + f(X2) + g(X1) + g(X2) + 1
+    = f(X1)g(X1) + f(X1)g(X2) + f(X2)*g(X1) + f(X2)*g(X2) + f(X1) + f(X2) + g(X1) + g(X2) + 1
+    = fg + fG + Fg + FG + f + F + g + G
+    = fg + f!G + !Fg + !F!G
+
+Let x be n variabls, X be the negation of another n variabls:
+
+*(x + X) + *(f + F) + 1
+
+Every function must contain a single variable cube, and there must be a one-to-one mapping from input variabls to functions where each function contains that variable as a single term cube.  Is this enough to guarentee a permutation?
+
+Try f = a, g = b + ab = a!b.  G is not balanced, so no.  Assume further that no combination of input inversions cause a function to not contain it's assigned variable.  Is that enough?  Look at adding a constante, where s1 = a1 + b1 + a0b0, and b0 and b1 are constant.  There are no cubes containing a1, so it can't be eliminated.
+
+If any cube contains the function's variable, it can be eliminted by inverting all the other variables in the cube.  Therefore, that function cannot provide that variable.  Each function may only allow it's variable to appear once, and by it'self.  Is this enough?
+
+f = a + bc, g = a + b, h = ab + c
+era
+f + g = bc + b = !bc
+
+This is not balanced, so it's not a permutation.
+
+PKC idea:
+
+Generate a random linear permutation of size N/2.  Call it P, with inverse Q.
+Randomly pick n two variable cubes of X[:n/2], with no duplicates and with both vars different.  Call this set R.
+for i = n/2 + 1 to n:
+    P, Q = expandPermByOne(P, Q, R, i)
+
+def expandPermByOne(P, Q, R, i):
+    g = randomSelection(X[:i]) + randomSelection(R where max input <= i)
+    f = X[i] + g
+    P.append(f)
+    for j = 1 to i-1:
+        if rand(2) == 1:
+            P[j] += f
+    also compute new Q...
+    return P, Q
+
+Try this for n=4:
+
+P = [f1, f2] = [x1 + x2, x2]
+R = x1*x2
+expanding...
+g = x1 + x1*x2
+f3 = x3 + x1 + x1*x2
+f1 = x1 + x2 + x3 + x1 = x2 + x3
+
+seems to work!
+
+My theory: this algorithm generates functions of the form randSel(X) + randSel(R), where randSel is uniformly random selection.  Try attacking it...
+
+P = LX + C, where X is encrypted output, L is boolean matrix, and C is the 2-var cubes of P.
+
+Linv*P = X + Linv*C
+
+We can transmute P into something like X + [randSel(R) for i = 1 to n].  This can be represented with an MxN binary matrix, where M is the size of R.  This appears hard to invert to me.
+
+Improve the above algorithm a bit by choosing N random 2-var cubes for R, with inputs uniformly randomly chosen.  Start with just f1 = x1, and add inputs one at a time.  When input i is added, compute it's g function as a random selection of cubes of R with both inputs <= i.
+
+I found that the inverse function appears not to be representable in a matrix form.  Too many high variable cubes are generated in the inverse, because the inverse of f[i+1] is composed with the previous inverse to get the state of the inputs from 1 to i.  The decoding algorithm will have to be encoded as the sequence of steps to do the decode.
+
+The single variable cubes in the public key can be eliminated by multiplying by the single cube's inverse matrix.  The double cubes also have to be multiplied by this matrix.  Then, the public key is simply the double cube matrix and R cubes.  This is representable with N^2 bits for the matrix + 2N*log2(N) bits to represent the random cubes.
+
+For 128 bits, that's:
+   ((2^7)^2 + 2*2^7*7 = 2^14 + 7*2^8)/8 = 2,272 bytes
+
+For 256 bits, that's:
+   ((2^8)^2 + 2*2^8*8 = 2^16 + 2^12)/8 = 8,704 bytes
+
+This could be cut in half by using half as many cubes in R.
+
+I found that 16x16 matricies have order 2^15 - 1. Hmmm.... Also 6x6 matricies
+had order 31, and 8x8 matricies had order 127.  Clearly, the max order is 
+
+order = 2^(N - 1) - 1

@@ -1,0 +1,36 @@
+This describes a public key exchange algorithm I've come up with, though it's
+more than likely extremely old and broken.
+
+Start with a large NxN binary matrix A, which is non-singular and which is a
+primitive generator for its permutation group.  The order of the permutation
+group of A is:
+
+    order = 2^(N - 1) - 1
+
+because A is simply a permutation of N elements, and going through all
+permutations of an N bit vector gives you this equation.
+
+Alice chooses secret key m, a random integer between 1 and order(A).  Bob
+similarly chooses secret key n.  Let the N-bit vector O = transpose([1, 0, 0,
+..., 0]).  Alice computes and transmits to Bob:
+
+(A^m)*O
+
+Bob computes and transmits:
+
+    (A^n)*O
+
+Alice then computes:
+
+    (A^m)*(A^n)*O
+
+and Bob computes:
+
+    (A^n)*(A^m)*O
+
+Both of these values are simply:
+
+    (A^(m+n))*O
+
+Bob and Alice then proceed to comunicate with this N-bit vector as their shared
+secret key.
