@@ -52,6 +52,32 @@ class Matrix:
                         res.value[i][j] ^= self.value[i][k] and other.value[k][j]
             return res
 
+    def __pow__(self, n):
+        if self.rows != self.cols:
+            raise ValueError, "Only square matrices can be raised to a power"
+        M = Matrix.identity(self.rows)
+        powers = [self] + [None for i in range(31)]
+        bit = 1
+        while 1 << bit <= n:
+            powers[bit] = powers[bit-1]*powers[bit-1]
+            bit += 1
+        bit = 0
+        while n != 0:
+            if n & 1:
+                M *= powers[bit]
+            bit += 1
+            n >>= 1
+        return M
+
+    def __eq__(self, other):
+        if self.rows != other.rows or self.cols != other.cols:
+            return False
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self[row][col] != other[row][col]:
+                    return False
+        return True
+
     def __getitem__(self, i):
         return self.value[i]
 
@@ -64,6 +90,14 @@ class Matrix:
         for i in range(self.rows):
             for j in range(self.cols):
                 res.value[j][i] = self.value[i][j]
+        return res
+
+    def rotate(self):
+        res = self.transpose()
+        for i in range(res.rows/2):
+            temp = res[i]
+            res[i] = res[res.rows - i - 1]
+            res[res.rows - i - 1] = temp
         return res
     
     def inverse(self):
@@ -124,23 +158,26 @@ class Matrix:
         return matrix
 
     @staticmethod
-    def randomNonSingularMatrix(size):
+    def randomNonSingularMatrix(size, odds=0.5):
         """Create a random non-singular Boolean matrix."""
         i = 0
         while True:
-            m = Matrix.randomMatrix(size, size)
+            m = Matrix.randomMatrix(size, size, odds)
             i += 1
             if not m.isSingular():
-                print "Generated signular matrix in", i, "tries"
-                return m
+                print "Generated non-signular matrix in", i, "tries"
+                a = m + Matrix.identity(m.rows)
+                if a.isSingular():
+                    print "Found non-singular matrix with no eigan vectors in", i, "tries"
+                    return m
 
     @staticmethod
-    def randomMatrix(rows, cols):
+    def randomMatrix(rows, cols, odds=0.5):
         """Create a random Boolean matrix."""
         m = Matrix.zero(rows, cols)
         for row in range(rows):
             for col in range(cols):
-                m[row][col] = random.randrange(2) == 1
+                m[row][col] = random.random() < odds
         return m
 
     def isSingular(self):
@@ -166,6 +203,12 @@ class Matrix:
             raise ValueError, "expanding by too small row"
         self.value.append(rowVal)
         self.rows += 1
+
+    def toTuple(self):
+        l = []
+        for i in range(self.rows):
+            l.append(tuple(self[i]))
+        return tuple(l)
 
 class Equ:
     """This class represents a class of Boolean equations written in XOR/AND
@@ -210,7 +253,7 @@ class Equ:
             s += " + " + cube
         print s[3:]
 
-class XorEnc:
+class BoolEnc:
     """Public key cryptosystem based on xor based equations.
        We can represent this form of permutations with two Boolean matricies,
        one for the single variable cubes, and one for the doubles."""
@@ -239,6 +282,9 @@ class XorEnc:
         (self.Qsingles*self.Psingles).show("Q*P singles")
         for i in range(N/2+1, N):
             self.expandPermByOne(i)
+        p1 = self.Psingles.inverse()
+        p2 = self.Psingles
+        (p1*p2).show("P*Pinv")
 
     def expandPermByOne(self, i):
         """i is the index of the new variable."""
@@ -251,12 +297,12 @@ class XorEnc:
         Fd = randomSelection(N)
         Ps.expand(Fs)
         Pd.expand(Fd)
-        # Add G into F[0] .. F[i-1]
+        # Add F[i] into F[0] .. F[i-1]
         for j in range(i-1):
             if random.randrange(2) == 1:
                 self.addInFunction(Fs, Ps[j])
                 self.addInFunction(Fd, Pd[j])
-        # Also compute new Q
+        # update new Q
         Ps.show("Final Ps")
         Pd.show("Final Pd")
 
@@ -313,4 +359,71 @@ def randomSelection(N):
 #m.show()
 #m.inverse().show()
 
-enc = XorEnc(16)
+#enc = BoolEnc(16)
+
+def findPermLength(N):
+    A = Matrix.randomNonSingularMatrix(N)
+    A.show()
+    i = 0
+    M = A.copy()
+    while True:
+        i += 1
+        M *= A
+        if M == A:
+            print "Permutation length is", i
+            return
+        if (i % 1000) == 0:
+            print i
+
+
+def findLog(A, p):
+    i = 0
+    K = A**1024
+    M = K.copy()
+    t = {}
+    print "populating rainbow table"
+    foundCollision = False
+    for i in range(1024):
+        if not foundCollision and M.toTuple() in t:
+            print "Found collision while building table", (i+1)*1024, t[M.toTuple()]
+            foundCollision = True
+        else:
+            t[M.toTuple()] = 1024*(i+1)
+        M *= K
+    M = A**p
+    # Test hack
+    #t[M.toTuple()] = 500000
+    print "looking for hit"
+    foundHit = False
+    lowestPower = 1 << 30
+    for i in range(1024):
+        if M.toTuple() in t:
+            power = t[M.toTuple()] - i
+            foundHit = True
+            if power < lowestPower:
+                print "Found log. p =", power
+                lowestPower = power
+        M *= A
+    if not foundHit:
+        print "Looks like no loops below 2**20"
+        return
+    (A**p).show("A**%d" % p)
+    (A**lowestPower).show("A**%d" % lowestPower)
+
+#findPermLength(32)
+#A1 = A*A*A*A*A
+#A2 = A**5
+#if A1 == A2:
+#    print "It's working"
+#else:
+#    print "Failed!"
+#    A.show("A")
+#    A1.show("A*A")
+#    A2.show("A**A")
+
+A = Matrix.randomNonSingularMatrix(24, 0.5)
+#A = Matrix.identity(16)
+#A[15][0] = 1
+#A.show("A")
+#(A*A).show("A*A")
+findLog(A, 5000000)
