@@ -165,10 +165,10 @@ class Matrix:
             m = Matrix.randomMatrix(size, size, odds)
             i += 1
             if not m.isSingular():
-                print "Generated non-signular matrix in", i, "tries"
+                #print "Generated non-signular matrix in", i, "tries"
                 a = m + Matrix.identity(m.rows)
-                if a.isSingular():
-                    print "Found non-singular matrix with no eigan vectors in", i, "tries"
+                if not a.isSingular():
+                    #print "Found non-singular matrix with no eigan vectors in", i, "tries"
                     return m
 
     @staticmethod
@@ -361,20 +361,17 @@ def randomSelection(N):
 
 #enc = BoolEnc(16)
 
-def findPermLength(N):
-    A = Matrix.randomNonSingularMatrix(N)
-    A.show()
+def findPermLength(A):
     i = 0
     M = A.copy()
     while True:
         i += 1
         M *= A
         if M == A:
-            print "Permutation length is", i
-            return
-        if (i % 1000) == 0:
-            print i
-
+            #print "Permutation length is", i
+            return i
+        #if (i % 1000) == 0:
+            #print i
 
 def findLog(A, p):
     K = A**1024
@@ -421,9 +418,28 @@ def findLog(A, p):
 #    A1.show("A*A")
 #    A2.show("A**A")
 
-A = Matrix.randomNonSingularMatrix(24, 0.5)
+A = Matrix([
+[1, 0, 1],
+[1, 0, 0],
+[0, 1, 0]])
+
+#values = {}
+for N in range(2, 25):
+    maxLength = 0
+    for i in range(1000):
+        B = Matrix.randomNonSingularMatrix(N, 0.5)
+        value = findPermLength(B)
+        if value > maxLength:
+            maxLength = value
+    print "For N =", N, "cycle length =", maxLength
+#    values[value] = None
+#print values.keys()
 #A = Matrix.identity(16)
 #A[15][0] = 1
 #A.show("A")
 #(A*A).show("A*A")
-findLog(A, 5000000)
+#findLog(A, 5000000)
+
+findPermLength(A)
+print A.isSingular()
+print (A + Matrix.identity(3)).isSingular()

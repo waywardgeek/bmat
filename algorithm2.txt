@@ -27,11 +27,11 @@ Here, I use * to mean the AND operation and + to mean XOR.  Also, you can multip
 
 In my head, I take the vector on the right, rotate it 90 degrees counter-clockwise, and AND it on the top row of the matrix.  This results in 1 0 0.  I then XOR these together to get 1, which I fill in the top row on the left.  Similarly I multiply the vector on the right times the middle row of the matrix to get the 0 in the middle on the left.
 
-Now that we have these operations, I can define A^m = A*A*A*A... m times.  It turns out that if we choose A correctly (and I still need to figure this part out), then A^m will not be equal to A unless m == 2^(N-1) - 1:
+Now that we have these operations, I can define A^m = A*A*A*A... m times.  It turns out that if we choose A correctly (and I still need to figure this part out), then A^m will not be equal to A unless m == 2^N - 1:
 
-    A^m == A implies m = 2^(N-1) - 1
+    A^m == A implies m = 2^N - 1
 
-So, for example, if N is 256, then we can keep multiplying m by A over and over for 2^(128) - 1 times before the result is converted back into m.  Let's also define a simple vertical N-bit vector called O (for One), that has 1 at the top and the rest 0.  For example O could be:
+So, for example, if N is 256, then we can keep multiplying m by A over and over for 2^256 - 1 times before the result is converted back into m.  Let's also define a simple vertical N-bit vector called O (for One), that has 1 at the top and the rest 0.  For example O could be:
 
 1
 0
@@ -40,8 +40,8 @@ So, for example, if N is 256, then we can keep multiplying m by A over and over 
 
 Here's the public key algorithm...
 
-- Alice picks a secret random number m between 1 and 2^(N-1) - 1.
-- Bob picks a secret random number n between 1 and 2^(N-1) - 1.
+- Alice picks a secret random number m between 1 and 2^N - 1.
+- Bob picks a secret random number n between 1 and 2^N - 1.
 - Alice computes (A^m)*O (This is an N-bit vertical vector).  She transmits this publicly to Bob.
 - Bob computes (A^n)*O and transmits it to Alice.
 - Alice multiplies the vector from Bob by (A^m), which only she knows.  The result is (A^m)*(A^n)*O = A^(m+n)*O

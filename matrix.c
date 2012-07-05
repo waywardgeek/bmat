@@ -4,11 +4,13 @@
 #include <math.h>
 #include <stdbool.h>
 
-// If setting WIDTH to 64, also change the dotProd function.
-#define WIDTH 32
-static unsigned N = WIDTH;
+typedef unsigned long long uint64;
 
-typedef unsigned long Row;
+// If setting WIDTH to 64, also change the dotProd function.
+#define WIDTH 64
+static uint64 N = WIDTH;
+
+typedef uint64 Row;
 
 typedef struct MatrixStruct *Matrix;
 typedef struct HashTableStruct *HashTable;
@@ -16,7 +18,7 @@ typedef struct HashTableStruct *HashTable;
 struct MatrixStruct {
     Row rowVal[WIDTH];
     Matrix nextMatrix;
-    unsigned power; // Written to matrices in hash table.
+    uint64 power; // Written to matrices in hash table.
 };
 
 static Matrix firstFreeMatrix = NULL; // I'll maintain a free list of matricies.
@@ -247,7 +249,8 @@ static int dotProd(Matrix A, Matrix B, int row, int col)
     Row vect = A->rowVal[row] & B->rowVal[col];
 
     // Note: this must be changed if working with 64-bit!
-    return parityTable[vect >> 16] ^ parityTable[vect & 0xffff];
+    return parityTable[(vect >> 16) & 0xffff] ^ parityTable[vect & 0xffff] ^
+        parityTable[(vect >> 32) & 0xffff] ^ parityTable[(vect >> 48) & 0xffff];
 }
 
 // This assumes B has been transposed, and is faster.
@@ -273,7 +276,7 @@ static Matrix multiply(Matrix A, Matrix B)
 // Compute M^n.
 static Matrix matrixPow(
     Matrix M,
-    unsigned n)
+    uint64 n)
 {
     Matrix res = identity();
     Matrix powers[WIDTH];
@@ -295,7 +298,7 @@ static Matrix matrixPow(
     return res;
 }
 
-static unsigned char xorSum(unsigned n)
+static unsigned char xorSum(uint64 n)
 {
     unsigned char value = 0;
 
@@ -384,7 +387,7 @@ static Matrix randomNonSingularMatrix(void)
         if(!isSingular(M)) {
             //printf("Generated non-signular matrix in %d tries\n", i);
             A = add(M, identity());
-            if(isSingular(A)) {
+            if(!isSingular(A)) {
                 //printf("Found non-singular matrix with no eigan vectors in %d tries\n", i);
                 return M;
             }
@@ -394,15 +397,15 @@ static Matrix randomNonSingularMatrix(void)
 
 // Find the cycle length p of the matrix such that A^p == A.  Only search up to maxCycle.
 // Return -1 if none found.
-static unsigned findCycleLength(Matrix A, long long maxCycle)
+static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 {
-    unsigned stepSize = (unsigned)(sqrt((double)maxCycle) + 0.5);
-    unsigned numSteps = (unsigned)maxCycle/stepSize;
+    uint64 stepSize = (uint64)(sqrt((double)maxCycle) + 0.5);
+    uint64 numSteps = (uint64)(maxCycle/stepSize);
     Matrix K = allocate(matrixPow(A, stepSize));
     Matrix M = K;
     Matrix otherM, Atran;
     HashTable hashTable = createHashTable(numSteps);
-    unsigned i, power, lowestPower;
+    uint64 i, power, lowestPower;
     bool foundCollision = false;
     bool foundHit = false;
 
@@ -465,8 +468,8 @@ static void powTest(void)
 {
     Matrix A = randomNonSingularMatrix();
     Matrix key1, key2;
-    unsigned n = rand();
-    unsigned m = rand();
+    uint64 n = rand();
+    uint64 m = rand();
 
     key1 = matrixPow(matrixPow(A, m), n);
     key2 = matrixPow(matrixPow(A, n), m);
@@ -477,10 +480,10 @@ static void powTest(void)
     }
 }
 
-static unsigned simpleFindCycleLength(Matrix A, long long maxCycle)
+static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
 {
     Matrix origA = allocate(A);
-    unsigned i;
+    uint64 i;
 
     for(i = 1; i < maxCycle; i++) {
         A = multiply(A, origA);
@@ -501,40 +504,46 @@ static unsigned simpleFindCycleLength(Matrix A, long long maxCycle)
 int main()
 {
     Matrix A;
-    unsigned i;
-    unsigned length, length2, maxLength = 0;
-    unsigned equalMax = 0;
-    unsigned total = 100;
-    unsigned maxCycle = 2200000000LL;
+    uint64 i;
+    uint64 length, length2, maxLength = 0;
+    uint64 equalMax = 0;
+    uint64 total = 1000;
+    uint64 maxCycle;
 
     initParityTable();
     N = 32;
     powTest();
 
-    for(i = 1; i < total; i++) {
-        A = allocate(randomNonSingularMatrix());
-        //printf("Original matrix\n");
-        //show(A);
-        //length = simpleFindCycleLength(A, maxCycle);
-        //printf("Cycle length is %d\n", length);
-        //show(matrixPow(A, length));
-        length = findCycleLength(A, maxCycle);
+    for(N = 2; N <= 31; N++) {
+        maxLength = 0;
+        maxCycle = 1LL << (N+1);
+        for(i = 0; i < total && maxLength != (1LL << N) - 1LL; i++) {
+            A = allocate(randomNonSingularMatrix());
+            //length = simpleFindCycleLength(A, maxCycle);
+            length = findCycleLength(A, maxCycle);
+            //length = simpleFindCycleLength(A, maxCycle);
+            if(length > maxLength) {
+                maxLength = length;
+            }
+            delete(A);
+        }
+        printf("For N=%lld, length=%lld\n", N, maxLength);
         //if(length != length2) {
             //length2 = findCycleLength(A, maxCycle);
             //printf("Errors in findCycleLength!\n");
         //}
-        if(maxLength < length) {
-            maxLength = length;
-            equalMax = 0;
-        }
-        if(length == maxLength) {
-            equalMax++;
-        }
-        if((i % (total/100)) == 0) {
-            printf("%d: maxLength=%d, length = %d\n", i, maxLength, length);
-        }
-        delete(A);
+        //if(maxLength < length) {
+            //maxLength = length;
+            //equalMax = 0;
+        //}
+        //if(length == maxLength) {
+            //equalMax++;
+        //}
+        //if((i % (total/100)) == 0) {
+            //printf("%lld: maxLength=%lld, length = %lld\n", i, maxLength, length);
+        //}
+        //delete(A);
     }
-    printf("Max: %d, percent equal to max: %f\n", maxLength, (100.0*equalMax)/total);
+    printf("Max: %lld, percent equal to max: %f\n", maxLength, (100.0*equalMax)/total);
     return 0;
 }
