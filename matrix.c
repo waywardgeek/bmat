@@ -395,6 +395,53 @@ static Matrix randomNonSingularMatrix(void)
     }
 }
 
+// Find if sequence A, A^2, A^4, ... , A^(2^(N-1)) has unique elements, and that
+// A^(2^N) == A.
+static bool hasGoodPowerOrder(Matrix A)
+{
+    Matrix M;
+    HashTable hashTable = createHashTable(N);
+    uint64 i;
+    bool passed;
+
+    A = allocate(A);
+    if(isSingular(A)) {
+        printf("Bug in finding non-singular matrix\n");
+    }
+    M = A;
+    for(i = 0; i < N; i++) {
+        if(lookupInHashTable(hashTable, M) != NULL) {
+            delHashTable(hashTable);
+            delete(A);
+            return false;
+        }
+        addToHashTable(hashTable, M);
+        M = multiply(M, M);
+    }
+    passed = equal(M, A);
+    if(isSingular(A)) {
+        printf("Bug in finding non-singular matrix at %lld!\n", i);
+    }
+    delHashTable(hashTable);
+    delete(A);
+    return passed;
+}
+
+// By "good", I mean the exponents A, A^2, A^4, ... A^(2^(N-1)) are unique, and
+// A^(2^N) == A.
+static Matrix randomGoodMatrix(void)
+{
+    Matrix A;
+
+    while(true) {
+        A = randomNonSingularMatrix();
+        if(hasGoodPowerOrder(A)) {
+            return A;
+        }
+    }
+    return NULL; // Dummy return
+}
+
 // Find the cycle length p of the matrix such that A^p == A.  Only search up to maxCycle.
 // Return -1 if none found.
 static uint64 findCycleLength(Matrix A, uint64 maxCycle)
@@ -501,38 +548,6 @@ static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
     return -1;
 }
 
-// Find if sequence A, A^2, A^4, ... , A^(2^(N-1)) has unique elements, and that
-// A^(2^N) == A.
-static bool hasGoodPowerOrder(Matrix A)
-{
-    Matrix M;
-    HashTable hashTable = createHashTable(N);
-    uint64 i;
-    bool passed;
-
-    A = allocate(A);
-    if(isSingular(A)) {
-        printf("Bug in finding non-singular matrix\n");
-    }
-    M = A;
-    for(i = 0; i < N; i++) {
-        if(lookupInHashTable(hashTable, M) != NULL) {
-            delHashTable(hashTable);
-            delete(A);
-            return false;
-        }
-        addToHashTable(hashTable, M);
-        M = multiply(M, M);
-    }
-    passed = equal(M, A);
-    if(isSingular(A)) {
-        printf("Bug in finding non-singular matrix at %lld!\n", i);
-    }
-    delHashTable(hashTable);
-    delete(A);
-    return passed;
-}
-
 // max order matrix, then test passes for N.
 static bool checkPrimeOrderTheory(void)
 {
@@ -567,8 +582,11 @@ int main()
     uint64 maxCycle;
 
     initParityTable();
-    N = 32;
+    N = 61;
     powTest();
+    A = randomGoodMatrix();
+    show(A);
+    return 0;
 
     for(N = 31; N <= 31; N++) {
         if(checkPrimeOrderTheory()) {

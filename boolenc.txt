@@ -158,8 +158,3 @@ For 256 bits, that's:
    ((2^8)^2 + 2*2^8*8 = 2^16 + 2^12)/8 = 8,704 bytes
 
 This could be cut in half by using half as many cubes in R.
-
-I found that 16x16 matricies have order 2^15 - 1. Hmmm.... Also 6x6 matricies
-had order 31, and 8x8 matricies had order 127.  Clearly, the max order is 
-
-order = 2^(N - 1) - 1
