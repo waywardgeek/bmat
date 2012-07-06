@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
-#include "boolenc.h" // We use ARC4 for a random number generator
+#include "bmat.h" // We use ARC4 for a random number generator
 
 static int N; // Width of matrices.
 static int numWords; // How many uint64 words are in each row.
@@ -14,27 +14,7 @@ static uint64 numRandomValues;
 static uint64 nextRandomValue = 0;
 static int nextRandomBit = 0;
 
-typedef struct MatrixStruct *Matrix;
-typedef struct HashTableStruct *HashTable;
-typedef struct BignumStruct *Bignum;
-
-struct MatrixStruct {
-    Matrix nextMatrix;
-    uint64 power; // Written to matrices in hash table.
-    uint64 data[1]; // Accessed by row*numWords + col/64
-};
-
 static Matrix firstFreeMatrix = NULL; // I'll maintain a free list of matricies.
-
-struct HashTableStruct {
-    unsigned size;
-    Matrix *matrices;
-};
-
-struct BignumStruct {
-    byte *data;
-    int bits;
-};
 
 // This table is for computing the parity of bits of 16-bit ints.
 static byte parityTable[1 << 16];
@@ -44,6 +24,18 @@ static byte parityTable[1 << 16];
 #define QUEUE_LEN 256
 static Matrix matrixQueue[QUEUE_LEN];
 static int queuePos = 0;
+
+// Structure definitions
+struct MatrixStruct {
+    Matrix nextMatrix;
+    uint64 power; // Written to matrices in hash table.
+    uint64 data[1]; // Accessed by row*numWords + col/64
+};
+
+struct HashTableStruct {
+    unsigned size;
+    Matrix *matrices;
+};
 
 static void setWidth(int width)
 {
@@ -173,7 +165,7 @@ static void addToHashTable(HashTable hashTable, Matrix M)
     hashTable->matrices[index] = M;
 }
 
-static inline void delete(Matrix M)
+void deleteMatrix(Matrix M)
 {
     M->nextMatrix = firstFreeMatrix;
     firstFreeMatrix = M;
@@ -188,7 +180,7 @@ static void delHashTable(HashTable hashTable)
         M = hashTable->matrices[i];
         while(M != NULL) {
             nextM = M->nextMatrix;
-            delete(M);
+            deleteMatrix(M);
             M = nextM;
         }
     }
@@ -234,45 +226,20 @@ static inline int getBit(Matrix M, int row, int col)
     return (M->data[row*numWords + word] >> bit) & 1;
 }
 
-static inline bool getBignumBit(Bignum n, int bit)
-{
-    return n->data[bit >> 3] >> (bit & 0x7) & 1;
-}
-
-static inline void setBignumBit(Bignum n, int bit, bool value)
-{
-    if(value) {
-        n->data[bit >> 3] |= 1 << (bit & 7);
-    } else {
-        n->data[bit >> 3] &= ~(1 << (bit & 7));
-    }
-}
-
-static inline Bignum makeBignum(uint64 value, int bits)
-{
-    Bignum n = (Bignum)calloc(1, sizeof(struct BignumStruct));
-    int i;
-
-    n->bits = bits;
-    n->data = (byte *)calloc((bits + 7) >> 3, sizeof(byte));
-    for(i = 0; i < bits; i++) {
-        setBignumBit(n, i, (value >> i) & 1);
-    }
-    return n;
-}
-
-static void deleteBignum(Bignum n)
-{
-    free(n->data);
-    free(n);
-}
-
 static Matrix zero(void)
 {
     Matrix M = newMatrix();
 
     memset((void *)M, 0, sizeof(struct MatrixStruct) + (N*numWords - 1)*sizeof(uint64));
     return M;
+}
+
+Matrix createMatrix(uint64 *data)
+{
+    Matrix M = zero();
+
+    memcpy(M->data, data, N*numWords*sizeof(uint64));
+    return allocate(M);
 }
 
 static Matrix identity(void)
@@ -286,7 +253,7 @@ static Matrix identity(void)
     return M;
 }
 
-static void show(Matrix M)
+void showMatrix(Matrix M)
 {
     int row, col;
 
@@ -299,7 +266,7 @@ static void show(Matrix M)
     printf("\n");
 }
 
-static void showHex(Matrix M)
+void showMatrixInHex(Matrix M)
 {
     int row, word;
     uint64 *p = M->data;
@@ -396,7 +363,7 @@ static Matrix multiply(Matrix A, Matrix B)
 }
 
 // Compute M^n.
-static Matrix matrixPow(
+Matrix matrixPow(
     Matrix M,
     Bignum n)
 {
@@ -531,7 +498,7 @@ static bool hasGoodPowerOrder(Matrix A)
     for(i = 0; i < N; i++) {
         if(lookupInHashTable(hashTable, M) != NULL) {
             delHashTable(hashTable);
-            delete(A);
+            deleteMatrix(A);
             return false;
         }
         addToHashTable(hashTable, M);
@@ -542,7 +509,7 @@ static bool hasGoodPowerOrder(Matrix A)
         printf("Bug in finding non-singular matrix at %lld!\n", i);
     }
     delHashTable(hashTable);
-    delete(A);
+    deleteMatrix(A);
     return passed;
 }
 
@@ -623,9 +590,9 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
         //printf("A^%d\n", lowestPower);
         //show(matrixPow(A, lowestPower));
     }
-    delete(A);
-    delete(Atran);
-    delete(K);
+    deleteMatrix(A);
+    deleteMatrix(Atran);
+    deleteMatrix(K);
     delHashTable(hashTable);
     return lowestPower;
 }
@@ -644,9 +611,9 @@ static void powTest(void)
     } else {
         printf("Failed pow test.\n");
     }
-    delete(key1);
-    delete(key2);
-    delete(A);
+    deleteMatrix(key1);
+    deleteMatrix(key2);
+    deleteMatrix(A);
 }
 
 static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
@@ -661,11 +628,11 @@ static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
         }
         if(equal(A, origA)) {
             //printf("Cycle length is %d\n", i);
-            delete(origA);
+            deleteMatrix(origA);
             return i;
         }
     }
-    delete(origA);
+    deleteMatrix(origA);
     printf("Cycle length is > %lld\n", maxCycle);
     return -1;
 }
@@ -683,13 +650,13 @@ static bool checkPrimeOrderTheory(void)
         if(hasGoodPowerOrder(A)) {
             order = findCycleLength(A, 1LL << (N + 1));
             if(order != (1 << N) - 1) {
-                delete(A);
+                deleteMatrix(A);
                 return false;
             }
             passes++;
             printf("Passed %lld times.\n", passes);
         }
-        delete(A);
+        deleteMatrix(A);
     }
     return true;
 }
@@ -737,6 +704,24 @@ static void initQueue(void)
     }
 }
 
+void initMatrixModule(int width)
+{
+    setWidth(width);
+    initParityTable();
+    readRandomData("random.txt");
+    for(i = 0; i < sizeof(password); i++) {
+        do {
+            c = randomByte();
+        } while(c == '\0');
+        password[i] = c;
+    }
+    password[sizeof(password) - 1] = '\0';
+    initKey(password, NULL, 0);
+    throwAwaySomeBytes(DISCARD_BYTES);
+    powTest();
+}
+
+#if 0
 int main()
 {
     Matrix A;
@@ -764,7 +749,7 @@ int main()
     initQueue();
     powTest();
     A = randomGoodMatrix();
-    showHex(A);
+    showMatrixInHex(A);
     return 0;
 
     for(N = 31; N <= 31; N++) {
@@ -788,10 +773,10 @@ int main()
             if(length > maxLength) {
                 maxLength = length;
             }
-            delete(A);
+            deleteMatrix(A);
         }
         printf("For N=%lld, length=%lld, found in %lld tries\n", N, maxLength, i);
-        show(A);
+        showMatrix(A);
         //if(length != length2) {
             //length2 = findCycleLength(A, maxCycle);
             //printf("Errors in findCycleLength!\n");
@@ -806,9 +791,10 @@ int main()
         //if((i % (total/100)) == 0) {
             //printf("%lld: maxLength=%lld, length = %lld\n", i, maxLength, length);
         //}
-        //delete(A);
+        //deleteMatrix(A);
     }
     printf("Max: %lld, percent equal to max: %f\n", maxLength, (100.0*equalMax)/total);
     */
     return 0;
 }
+#endif
