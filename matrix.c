@@ -3,22 +3,25 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
+#include "boolenc.h" // We use ARC4 for a random number generator
 
-typedef unsigned long long uint64;
+static int N; // Width of matrices.
+static int numWords; // How many uint64 words are in each row.
 
-// If setting WIDTH to 64, also change the dotProd function.
-#define WIDTH 64
-static uint64 N = WIDTH;
-
-typedef uint64 Row;
+// This is one megabyte of random data from 2012-07-06 at random.org
+static byte *randomValues;
+static uint64 numRandomValues;
+static uint64 nextRandomValue = 0;
+static int nextRandomBit = 0;
 
 typedef struct MatrixStruct *Matrix;
 typedef struct HashTableStruct *HashTable;
+typedef struct BignumStruct *Bignum;
 
 struct MatrixStruct {
-    Row rowVal[WIDTH];
     Matrix nextMatrix;
     uint64 power; // Written to matrices in hash table.
+    uint64 data[1]; // Accessed by row*numWords + col/64
 };
 
 static Matrix firstFreeMatrix = NULL; // I'll maintain a free list of matricies.
@@ -28,14 +31,61 @@ struct HashTableStruct {
     Matrix *matrices;
 };
 
+struct BignumStruct {
+    byte *data;
+    int bits;
+};
+
 // This table is for computing the parity of bits of 16-bit ints.
-static unsigned char parityTable[1 << 16];
+static byte parityTable[1 << 16];
 
 // This is a queue of temporary matrices, which get reused after a while.  To
 // allocate a matrix permanently, call copy.
 #define QUEUE_LEN 256
-static struct MatrixStruct matrixQueue[QUEUE_LEN];
+static Matrix matrixQueue[QUEUE_LEN];
 static int queuePos = 0;
+
+static void setWidth(int width)
+{
+    N = width;
+    numWords = (N + 63)/64;
+}
+
+// Hopefully random enough function, using ARC4 XORed on top of some actual
+// random data, but the random data gets reused if there's not enough of it.
+static inline byte randomByte(void)
+{
+    if(nextRandomValue == numRandomValues) {
+        nextRandomValue = 0;
+    }
+    nextRandomBit = 0;
+    return hashChar(randomValues[nextRandomValue++]);
+}
+
+static inline bool randomBool(void)
+{
+    if(nextRandomBit == 8) {
+        nextRandomBit = 0;
+        nextRandomValue++;
+        if(nextRandomValue == numRandomValues) {
+            nextRandomValue = 0;
+        }
+    }
+    return parityTable[hashChar(0)] ^
+        ((randomValues[nextRandomValue] >> nextRandomBit++) & 1);
+}
+
+// Return 8 random bytes in a uint64.
+static inline uint64 randomUint64(void)
+{
+    uint64 value = 0LL;
+    int i;
+
+    for(i = 0; i < 8; i++) {
+        value |= (uint64)(randomByte()) << 8*i;
+    }
+    return value;
+}
 
 // Hash table functions.
 
@@ -48,9 +98,11 @@ static unsigned hashMatrix(Matrix M)
 {
     int i;
     unsigned int hash = 0;
+    uint64 *p = M->data;
 
-    for(i = 0; i < N; i++) {
-        hash = hashValues(hash, M->rowVal[i]);
+    for(i = N*numWords; i != 0; i--) {
+        hash = hashValues(hash, (unsigned)*p);
+        hash = hashValues(hash, (unsigned)(*p++ >> 32));
     }
     return hash;
 }
@@ -67,9 +119,11 @@ static HashTable createHashTable(unsigned size)
 static bool equal(Matrix A, Matrix B)
 {
     int i;
+    uint64 *p = A->data;
+    uint64 *q = B->data;
 
-    for(i = 0; i < N; i++) {
-        if(A->rowVal[i] != B->rowVal[i]) {
+    for(i = N*numWords; i != 0; i--) {
+        if(*p++ != *q++) {
             return false;
         }
     }
@@ -90,18 +144,21 @@ static inline Matrix allocate(Matrix oldM)
 {
     Matrix M = firstFreeMatrix;
     static int totalAllocated = 0;
+    size_t size = sizeof(struct MatrixStruct) + (N*numWords - 1)*sizeof(uint64);
 
     if(M != NULL) {
         firstFreeMatrix = M->nextMatrix;
         M->nextMatrix = NULL;
     } else {
-        M = (Matrix)malloc(sizeof(struct MatrixStruct));
+        M = (Matrix)malloc(size);
         totalAllocated++;
         //if((totalAllocated % 1000) == 0) {
             //printf("Allocated %d matrices\n", totalAllocated);
         //}
     }
-    memcpy((void *)M, (void *)oldM, sizeof(struct MatrixStruct));
+    if(oldM != NULL) {
+        memcpy((void *)M, (void *)oldM, size);
+    }
     M->nextMatrix = NULL;
     return M;
 }
@@ -144,37 +201,77 @@ static inline Matrix newMatrix(void)
     if(++queuePos == QUEUE_LEN) {
         queuePos = 0;
     }
-    return matrixQueue + queuePos;
+    return matrixQueue[queuePos];
 }
 
 static inline Matrix copy(Matrix oldM)
 {
     Matrix M = newMatrix();
 
-    memcpy((void *)M, (void *)oldM, sizeof(struct MatrixStruct));
+    memcpy((void *)M, (void *)oldM,
+        sizeof(struct MatrixStruct) + (N*numWords - 1)*sizeof(uint64));
     M->nextMatrix = NULL;
     return M;
 }
 
 static inline void setBit(Matrix M, int row, int col, int value)
 {
+    int word = col >> 6;
+    int bit = col & 0x3f;
+
     if(value) {
-        M->rowVal[row] |= 1LL << col;
+        M->data[row*numWords + word] |= 1LL << bit;
     } else {
-        M->rowVal[row] &= ~(1LL << col);
+        M->data[row*numWords + word] &= ~(1LL << bit);
     }
 }
 
 static inline int getBit(Matrix M, int row, int col)
 {
-    return (M->rowVal[row] >> col) & 1;
+    int word = col >> 6;
+    int bit = col & 0x3f;
+
+    return (M->data[row*numWords + word] >> bit) & 1;
+}
+
+static inline bool getBignumBit(Bignum n, int bit)
+{
+    return n->data[bit >> 3] >> (bit & 0x7) & 1;
+}
+
+static inline void setBignumBit(Bignum n, int bit, bool value)
+{
+    if(value) {
+        n->data[bit >> 3] |= 1 << (bit & 7);
+    } else {
+        n->data[bit >> 3] &= ~(1 << (bit & 7));
+    }
+}
+
+static inline Bignum makeBignum(uint64 value, int bits)
+{
+    Bignum n = (Bignum)calloc(1, sizeof(struct BignumStruct));
+    int i;
+
+    n->bits = bits;
+    n->data = (byte *)calloc((bits + 7) >> 3, sizeof(byte));
+    for(i = 0; i < bits; i++) {
+        setBignumBit(n, i, (value >> i) & 1);
+    }
+    return n;
+}
+
+static void deleteBignum(Bignum n)
+{
+    free(n->data);
+    free(n);
 }
 
 static Matrix zero(void)
 {
     Matrix M = newMatrix();
 
-    memset((void *)M, 0, sizeof(struct MatrixStruct));
+    memset((void *)M, 0, sizeof(struct MatrixStruct) + (N*numWords - 1)*sizeof(uint64));
     return M;
 }
 
@@ -194,13 +291,30 @@ static void show(Matrix M)
     int row, col;
 
     for(row = 0; row < N; row++) {
-        printf("%d", getBit(M, row, 0));
-        for(col = 1; col < N; col++) {
-            printf(" %d", getBit(M, row, col));
+        for(col = 0; col < N; col++) {
+            printf("%d", getBit(M, row, col));
         }
         printf("\n");
     }
     printf("\n");
+}
+
+static void showHex(Matrix M)
+{
+    int row, word;
+    uint64 *p = M->data;
+
+    printf("uint64 A%d_data = {\n", N);
+    for(row = 0; row < N; row++) {
+        for(word = 0; word < numWords; word++) {
+            if(word != 0) {
+                printf(", ");
+            }
+            printf("0x%llxLL", *p++);
+        }
+        printf(",\n");
+    }
+    printf("};\n");
 }
 
 static Matrix rotate(Matrix M)
@@ -244,13 +358,21 @@ static Matrix add(Matrix A, Matrix B)
 }
 
 // Computes one value in matrix multiply, but N must be transposed.
-static int dotProd(Matrix A, Matrix B, int row, int col)
+static inline int dotProd(Matrix A, Matrix B, int row, int col)
 {
-    Row vect = A->rowVal[row] & B->rowVal[col];
+    uint64 *p = A->data + row*numWords;
+    uint64 *q = B->data + col*numWords;
+    uint64 v;
+    int value = 0;
+    int i;
 
-    // Note: this must be changed if working with 64-bit!
-    return parityTable[(vect >> 16) & 0xffff] ^ parityTable[vect & 0xffff] ^
-        parityTable[(vect >> 32) & 0xffff] ^ parityTable[(vect >> 48) & 0xffff];
+   
+    for(i = 0; i < numWords; i++) {
+        v = *p++ & *q++;
+        value ^= parityTable[(unsigned short)v] ^ parityTable[(unsigned short)(v >> 16)] ^
+            parityTable[(unsigned short)(v >> 32)] ^ parityTable[(unsigned short)(v >> 48)];
+    }
+    return value;
 }
 
 // This assumes B has been transposed, and is faster.
@@ -267,7 +389,7 @@ static Matrix multiplyTransposed(Matrix A, Matrix B)
     return res;
 }
 
-// This is much slower, since it has to transpose N first.
+// This is slower, since it has to transpose N first.
 static Matrix multiply(Matrix A, Matrix B)
 {
     return multiplyTransposed(A, transpose(B));
@@ -276,31 +398,23 @@ static Matrix multiply(Matrix A, Matrix B)
 // Compute M^n.
 static Matrix matrixPow(
     Matrix M,
-    uint64 n)
+    Bignum n)
 {
     Matrix res = identity();
-    Matrix powers[WIDTH];
-    int bit = 1;
+    int i;
 
-    powers[0] = M;
-    while(bit < 32 && (1 << bit) <= n) {
-        powers[bit] = multiply(powers[bit-1], powers[bit-1]);
-        bit += 1;
-    }
-    bit = 0;
-    while(n != 0) {
-        if(n & 1) {
-            res = multiply(res, powers[bit]);
+    for(i = 0; i < n->bits; i++) {
+        if(getBignumBit(n, i)) {
+            res = multiply(res, M);
         }
-        bit += 1;
-        n >>= 1;
+        M = multiply(M, M);
     }
     return res;
 }
 
-static unsigned char xorSum(uint64 n)
+static byte xorSum(uint64 n)
 {
-    unsigned char value = 0;
+    byte value = 0;
 
     while(n != 0) {
         if(n & 1) {
@@ -336,7 +450,13 @@ static int findNonZeroRow(Matrix M, int pos)
 // XOR the source row into the dest row.
 static inline void xorRow(Matrix M, int source, int dest)
 {
-    M->rowVal[dest] ^= M->rowVal[source];
+    uint64 *s = M->data + source*numWords;
+    uint64 *d = M->data + dest*numWords;
+    int i;
+
+    for(i = 0; i < numWords; i++) {
+        *d++ ^= *s++;
+    }
 }
 
 static bool isSingular(Matrix M)
@@ -369,7 +489,7 @@ static Matrix randomMatrix()
 
     for(row = 0; row < N; row++) {
         for(col = 0; col < N; col++) {
-            setBit(M, row, col, rand() & 0x1);
+            setBit(M, row, col, randomBool());
         }
     }
     return M;
@@ -395,8 +515,7 @@ static Matrix randomNonSingularMatrix(void)
     }
 }
 
-// Find if sequence A, A^2, A^4, ... , A^(2^(N-1)) has unique elements, and that
-// A^(2^N) == A.
+// Find if sequence A, A^2, A^4, ... , A^(2^(N-1)) has unique elements, and that A^(2^N) == A.
 static bool hasGoodPowerOrder(Matrix A)
 {
     Matrix M;
@@ -448,7 +567,7 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 {
     uint64 stepSize = (uint64)(sqrt((double)maxCycle) + 0.5);
     uint64 numSteps = (uint64)(maxCycle/stepSize);
-    Matrix K = allocate(matrixPow(A, stepSize));
+    Matrix K = allocate(matrixPow(A, makeBignum(stepSize, 64)));
     Matrix M = K;
     Matrix otherM, Atran;
     HashTable hashTable = createHashTable(numSteps);
@@ -513,18 +632,21 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 
 static void powTest(void)
 {
-    Matrix A = randomNonSingularMatrix();
+    Matrix A = allocate(randomNonSingularMatrix());
     Matrix key1, key2;
-    uint64 n = rand();
-    uint64 m = rand();
+    Bignum n = makeBignum(randomUint64(), 64);
+    Bignum m = makeBignum(randomUint64(), 64);
 
-    key1 = matrixPow(matrixPow(A, m), n);
-    key2 = matrixPow(matrixPow(A, n), m);
+    key1 = allocate(matrixPow(matrixPow(A, m), n));
+    key2 = allocate(matrixPow(matrixPow(A, n), m));
     if(equal(key1, key2)) {
         printf("Passed pow test.\n");
     } else {
         printf("Failed pow test.\n");
     }
+    delete(key1);
+    delete(key2);
+    delete(A);
 }
 
 static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
@@ -572,6 +694,49 @@ static bool checkPrimeOrderTheory(void)
     return true;
 }
 
+static void readRandomData(
+    char *fileName)
+{
+    FILE *file = fopen(fileName, "r");
+    int c, i = 0, j;
+    byte b;
+
+    numRandomValues = 1 << 20; // Lucky guess!
+    randomValues = (byte *)calloc(numRandomValues, sizeof(byte));
+    if(file == NULL) {
+        printf("Unable to rad random.txt\n");
+        return;
+    }
+    c = getc(file);
+    while(c != EOF) {
+        if(i == numRandomValues) {
+            numRandomValues <<= 1;
+            randomValues = (byte *)realloc(randomValues, numRandomValues*sizeof(byte));
+        }
+        b = 0;
+        for(j = 0; c != EOF && j < 8; j++) {
+            c = getc(file);
+            if(c == '1') {
+                b |= 1 << j;
+            }
+        }
+        if(c != EOF) {
+            randomValues[i++] = b;
+        }
+    }
+    fclose(file);
+}
+
+// Initialize the matricies in the temporary queue.
+static void initQueue(void)
+{
+    int i;
+
+    for(i = 0; i < QUEUE_LEN; i++) {
+        matrixQueue[i] = allocate(NULL);
+    }
+}
+
 int main()
 {
     Matrix A;
@@ -580,19 +745,33 @@ int main()
     uint64 equalMax = 0;
     uint64 total = 1000;
     uint64 maxCycle;
+    char password[1024];
+    byte c;
 
+    setWidth(127);
     initParityTable();
-    N = 61;
+    readRandomData("random.txt");
+    for(i = 0; i < sizeof(password); i++) {
+        do {
+            c = randomByte();
+        } while(c == '\0');
+        password[i] = c;
+    }
+    password[sizeof(password) - 1] = '\0';
+    initKey(password, NULL, 0);
+    throwAwaySomeBytes(DISCARD_BYTES);
+
+    initQueue();
     powTest();
     A = randomGoodMatrix();
-    show(A);
+    showHex(A);
     return 0;
 
     for(N = 31; N <= 31; N++) {
         if(checkPrimeOrderTheory()) {
-            printf("N %lld passed\n", N);
+            printf("N %d passed\n", N);
         } else {
-            printf("N %lld failed\n", N);
+            printf("N %d failed\n", N);
         }
     }
 
