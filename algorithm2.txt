@@ -52,3 +52,9 @@ Now Alice and Bob both share the secret key A^(m+n)*O.  They then use this key t
 This can also be used for in public key encryption, where anyone can send encrypted documents to Bob anonymously, and only Bob can decrypt them.  Also, Bob can sign documents with his private key and anyone can use his public key to verify his signature.
 
 To send an encrypted document to Bob, Alice just attaches here public key (A^m)*O to a document encrypted with the shared key.  Only Bob can decrypt it.
+
+Now for the last trick... here's my conjecture as how to find good matrices A.  First, only use N if it is in this sequence:
+
+2, 3, 5, 7, 13, 17, 19, 31, 61, 89, 107, 127, 521, 607, 1279, 2203, 2281
+
+These are Mersenne numbers, which are primes of the form 2^N - 1.  Second, only accept non-singular random matrices with no eigenvectors, meaning A + I is also non-singular.  Finally, require that the sequence A, A^2, A^4, ... A(2^(N-1)) has unique values and that A^(2^N) == A.

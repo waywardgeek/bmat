@@ -97,9 +97,9 @@ static inline Matrix allocate(Matrix oldM)
     } else {
         M = (Matrix)malloc(sizeof(struct MatrixStruct));
         totalAllocated++;
-        if((totalAllocated % 1000) == 0) {
-            printf("Allocated %d matrices\n", totalAllocated);
-        }
+        //if((totalAllocated % 1000) == 0) {
+            //printf("Allocated %d matrices\n", totalAllocated);
+        //}
     }
     memcpy((void *)M, (void *)oldM, sizeof(struct MatrixStruct));
     M->nextMatrix = NULL;
@@ -159,9 +159,9 @@ static inline Matrix copy(Matrix oldM)
 static inline void setBit(Matrix M, int row, int col, int value)
 {
     if(value) {
-        M->rowVal[row] |= 1 << col;
+        M->rowVal[row] |= 1LL << col;
     } else {
-        M->rowVal[row] &= ~(1 << col);
+        M->rowVal[row] &= ~(1LL << col);
     }
 }
 
@@ -501,6 +501,62 @@ static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
     return -1;
 }
 
+// Find if sequence A, A^2, A^4, ... , A^(2^(N-1)) has unique elements, and that
+// A^(2^N) == A.
+static bool hasGoodPowerOrder(Matrix A)
+{
+    Matrix M;
+    HashTable hashTable = createHashTable(N);
+    uint64 i;
+    bool passed;
+
+    A = allocate(A);
+    if(isSingular(A)) {
+        printf("Bug in finding non-singular matrix\n");
+    }
+    M = A;
+    for(i = 0; i < N; i++) {
+        if(lookupInHashTable(hashTable, M) != NULL) {
+            delHashTable(hashTable);
+            delete(A);
+            return false;
+        }
+        addToHashTable(hashTable, M);
+        M = multiply(M, M);
+    }
+    passed = equal(M, A);
+    if(isSingular(A)) {
+        printf("Bug in finding non-singular matrix at %lld!\n", i);
+    }
+    delHashTable(hashTable);
+    delete(A);
+    return passed;
+}
+
+// max order matrix, then test passes for N.
+static bool checkPrimeOrderTheory(void)
+{
+    Matrix A;
+    uint64 i, order;
+    uint64 passes = 0;
+
+    for(i = 0; i < 1000; i++) {
+        A = randomNonSingularMatrix();
+        A = allocate(A);
+        if(hasGoodPowerOrder(A)) {
+            order = findCycleLength(A, 1LL << (N + 1));
+            if(order != (1 << N) - 1) {
+                delete(A);
+                return false;
+            }
+            passes++;
+            printf("Passed %lld times.\n", passes);
+        }
+        delete(A);
+    }
+    return true;
+}
+
 int main()
 {
     Matrix A;
@@ -514,10 +570,20 @@ int main()
     N = 32;
     powTest();
 
-    for(N = 2; N <= 31; N++) {
+    for(N = 31; N <= 31; N++) {
+        if(checkPrimeOrderTheory()) {
+            printf("N %lld passed\n", N);
+        } else {
+            printf("N %lld failed\n", N);
+        }
+    }
+
+    /*
+    for(N = 40; N <= 40; N++) {
         maxLength = 0;
         maxCycle = 1LL << (N+1);
         for(i = 0; i < total && maxLength != (1LL << N) - 1LL; i++) {
+            printf("Try %lld\n", i);
             A = allocate(randomNonSingularMatrix());
             //length = simpleFindCycleLength(A, maxCycle);
             length = findCycleLength(A, maxCycle);
@@ -527,7 +593,8 @@ int main()
             }
             delete(A);
         }
-        printf("For N=%lld, length=%lld\n", N, maxLength);
+        printf("For N=%lld, length=%lld, found in %lld tries\n", N, maxLength, i);
+        show(A);
         //if(length != length2) {
             //length2 = findCycleLength(A, maxCycle);
             //printf("Errors in findCycleLength!\n");
@@ -545,5 +612,6 @@ int main()
         //delete(A);
     }
     printf("Max: %lld, percent equal to max: %f\n", maxLength, (100.0*equalMax)/total);
+    */
     return 0;
 }

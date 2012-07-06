@@ -10,6 +10,12 @@ class Matrix:
         self.value = value
         self.rows = len(value)
         self.cols = len(value[0])
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.value[row][col]:
+                    self.value[row][col] = True
+                else:
+                    self.value[row][col] = False
 
     def copy(self):
         value = [row[:] for row in self.value]
@@ -373,6 +379,30 @@ def findPermLength(A):
         #if (i % 1000) == 0:
             #print i
 
+def findPowerLength(A):
+    i = 0
+    M = A.copy()
+    powers = {}
+    while True:
+        M *= M
+        if M.toTuple() in powers:
+            if not A.toTuple() in powers:
+                return -1
+            return i
+        powers[M.toTuple()] = M
+        i += 1
+
+def findOLength(A):
+    i = 1
+    O = Matrix.zero(A.rows, 1)
+    O[0][0] = True
+    M = A*O
+    while True:
+        if M == O:
+            return i
+        i += 1
+        M = A*M
+
 def findLog(A, p):
     K = A**1024
     M = K.copy()
@@ -407,6 +437,15 @@ def findLog(A, p):
     (A**p).show("A**%d" % p)
     (A**lowestPower).show("A**%d" % lowestPower)
 
+def findRandMaxOrderMatrix(size):
+    i = 1
+    while True:
+        A = Matrix.randomNonSingularMatrix(size)
+        if findPermLength(A) == (1 << size) - 1:
+            print "Found max matrix in", i, "tries."
+            return A
+        i += 1
+
 #findPermLength(32)
 #A1 = A*A*A*A*A
 #A2 = A**5
@@ -418,20 +457,15 @@ def findLog(A, p):
 #    A1.show("A*A")
 #    A2.show("A**A")
 
-A = Matrix([
-[1, 0, 1],
-[1, 0, 0],
-[0, 1, 0]])
-
 #values = {}
-for N in range(2, 25):
-    maxLength = 0
-    for i in range(1000):
-        B = Matrix.randomNonSingularMatrix(N, 0.5)
-        value = findPermLength(B)
-        if value > maxLength:
-            maxLength = value
-    print "For N =", N, "cycle length =", maxLength
+#for N in range(2, 25):
+#    maxLength = 0
+#    for i in range(1000):
+#        B = Matrix.randomNonSingularMatrix(N, 0.5)
+#        value = findPermLength(B)
+#        if value > maxLength:
+#            maxLength = value
+#    print "For N =", N, "cycle length =", maxLength
 #    values[value] = None
 #print values.keys()
 #A = Matrix.identity(16)
@@ -440,6 +474,31 @@ for N in range(2, 25):
 #(A*A).show("A*A")
 #findLog(A, 5000000)
 
-findPermLength(A)
-print A.isSingular()
-print (A + Matrix.identity(3)).isSingular()
+#for N in range(2, 13):
+#    print "----------------------------", N
+#    for i in range(10):
+#        A = Matrix.randomNonSingularMatrix(N, 0.5)
+#        length = findPermLength(A)
+#        print length
+
+# Test for verifying that perm length == O length
+#for N in range(2, 12):
+#    for i in range(100):
+#        A = findRandMaxOrderMatrix(N)
+#        length = findOLength(A)
+#        permLength = findPermLength(A)
+#        print "O length is", length, "but perm length is", permLength
+#        if length != permLength:
+
+# Find the order of the power group of A
+for N in range(2, 15):
+    print "Testing N =", N
+    worked = True
+    for i in range(50):
+        A = Matrix.randomNonSingularMatrix(N)
+        #A = findRandMaxOrderMatrix(N)
+        permLength = findPermLength(A)
+        powerLength = findPowerLength(A)
+        if powerLength == N and permLength != (1 << N) -1:
+            worked = False
+    print "For size", N, worked
