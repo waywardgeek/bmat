@@ -1,0 +1,4 @@
+The Discrete Logarithm Problem in GL(n,q)
+Alfred J. Menezes and Yi-Hong Wu
+
+A. Odlyzko, "Descrete logarithms in finite fields and their cryptographic significance", Advances in Crytology - Proceedings of Eurocrypt '84, Lecture Notes in Computer Science, 209 (1985), Springer-Verlag, 224-314
