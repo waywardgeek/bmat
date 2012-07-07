@@ -121,7 +121,7 @@ Bignum readKey(char *fileName, int bits)
     int numRead;
 
     if(file == NULL) {
-        printf("Unable to write to file %s.\n", fileName);
+        printf("Unable to read from file %s.\n", fileName);
         return NULL;
     }
     numRead = fread(buffer, sizeof(byte), numBytes, file);
