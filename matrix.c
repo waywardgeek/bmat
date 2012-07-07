@@ -131,7 +131,7 @@ static Matrix lookupInHashTable(HashTable hashTable, Matrix M)
     return otherM;
 }
 
-static inline Matrix allocate(Matrix oldM)
+Matrix allocateMatrix(Matrix oldM)
 {
     Matrix M = firstFreeMatrix;
     static int totalAllocated = 0;
@@ -159,7 +159,7 @@ static void addToHashTable(HashTable hashTable, Matrix M)
     unsigned index = hashMatrix(M) % hashTable->size;
     Matrix otherM = hashTable->matrices[index];
 
-    M = allocate(M);
+    M = allocateMatrix(M);
     M->nextMatrix = otherM;
     hashTable->matrices[index] = M;
 }
@@ -249,7 +249,7 @@ Matrix createMatrix(uint64 *data)
     Matrix M = zero();
 
     memcpy(M->data, data, N*numWords*sizeof(uint64));
-    return allocate(M);
+    return allocateMatrix(M);
 }
 
 static Matrix identity(void)
@@ -385,9 +385,42 @@ static Matrix multiplyTransposed(Matrix A, Matrix B)
 }
 
 // This is slower, since it has to transpose N first.
-Matrix matrixMultiply(Matrix A, Matrix B)
+Matrix matrixMultiplySlow(Matrix A, Matrix B)
 {
     return multiplyTransposed(A, transpose(B));
+}
+
+// XOR the source row into the dest row.
+static inline void xorMatrixRows(Matrix S, Matrix D, int source, int dest)
+{
+    uint64 *s = S->data + source*numWords;
+    uint64 *d = D->data + dest*numWords;
+    int i;
+
+    for(i = 0; i < numWords; i++) {
+        *d++ ^= *s++;
+    }
+}
+
+// Another, hopefully faster multiply.
+Matrix matrixMultiply(Matrix A, Matrix B)
+{
+    Matrix res = zero();
+    uint64 word;
+    int row, xWord, bit;
+
+    for(row = 0; row < N; row++) {
+        for(xWord = 0; xWord < numWords; xWord++) {
+            word = A->data[row*numWords + xWord];
+            for(bit = 0; bit < 64 && word; bit++) {
+                if(word & 1) {
+                    xorMatrixRows(B, res, (xWord << 6) + bit, row);
+                }
+                word >>= 1;
+            }
+        }
+    }
+    return res;
 }
 
 // Multiply a matrix by a Bignum vector.  We assum it's vertical and on the right.
@@ -531,7 +564,7 @@ static bool hasGoodPowerOrder(Matrix A)
     uint64 i;
     bool passed;
 
-    A = allocate(A);
+    A = allocateMatrix(A);
     if(isSingular(A)) {
         printf("Bug in finding non-singular matrix\n");
     }
@@ -575,7 +608,7 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 {
     uint64 stepSize = (uint64)(sqrt((double)maxCycle) + 0.5);
     uint64 numSteps = (uint64)(maxCycle/stepSize);
-    Matrix K = allocate(matrixPow(A, createBignum(stepSize, 64)));
+    Matrix K = allocateMatrix(matrixPow(A, createBignum(stepSize, 64)));
     Matrix M = K;
     Matrix otherM, Atran;
     HashTable hashTable = createHashTable(numSteps);
@@ -583,8 +616,8 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
     bool foundCollision = false;
     bool foundHit = false;
 
-    A = allocate(A);
-    Atran = allocate(transpose(A));
+    A = allocateMatrix(A);
+    Atran = allocateMatrix(transpose(A));
     //printf("populating hash table\n");
     for(i = 0; i < numSteps && !foundCollision; i++) {
         M->power = (i+1)*stepSize;
@@ -640,13 +673,13 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 
 void powTest(void)
 {
-    Matrix A = allocate(randomNonSingularMatrix());
+    Matrix A = allocateMatrix(randomNonSingularMatrix());
     Matrix key1, key2;
     Bignum n = createBignum(randomUint64(), 64);
     Bignum m = createBignum(randomUint64(), 64);
 
-    key1 = allocate(matrixPow(matrixPow(A, m), n));
-    key2 = allocate(matrixPow(matrixPow(A, n), m));
+    key1 = allocateMatrix(matrixPow(matrixPow(A, m), n));
+    key2 = allocateMatrix(matrixPow(matrixPow(A, n), m));
     if(equal(key1, key2)) {
         printf("Passed pow test.\n");
     } else {
@@ -659,7 +692,7 @@ void powTest(void)
 
 static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
 {
-    Matrix origA = allocate(A);
+    Matrix origA = allocateMatrix(A);
     uint64 i;
 
     for(i = 1; i < maxCycle; i++) {
@@ -687,7 +720,7 @@ static bool checkPrimeOrderTheory(void)
 
     for(i = 0; i < 1000; i++) {
         A = randomNonSingularMatrix();
-        A = allocate(A);
+        A = allocateMatrix(A);
         if(hasGoodPowerOrder(A)) {
             order = findCycleLength(A, 1LL << (N + 1));
             if(order != (1 << N) - 1) {
@@ -740,8 +773,6 @@ static void readRandomData(
     char *fileName)
 {
     FILE *file = fopen(fileName, "rb");
-    int c, i = 0, j;
-    byte b;
     unsigned numRead, totalRead = 0;
 
     numRandomValues = 1 << 20; // Lucky guess!
@@ -781,7 +812,7 @@ static void initQueue(void)
     int i;
 
     for(i = 0; i < QUEUE_LEN; i++) {
-        matrixQueue[i] = allocate(NULL);
+        matrixQueue[i] = allocateMatrix(NULL);
     }
 }
 

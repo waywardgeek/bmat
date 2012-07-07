@@ -1,5 +1,5 @@
-CFLAGS=-g -Wall -Wno-unused
-#CFLAGS=-O2 -Wall -Wno-unused-function
+#CFLAGS=-g -Wall -Wno-unused
+CFLAGS=-O2 -Wall -Wno-unused-function
 
 all: genkey genmatrix secret random
 

@@ -54,7 +54,7 @@ static Bignum createPrivateKey(
 int main(int argc, char **argv)
 {
     Matrix A;
-    Bignum privateKey, publicKey, key;
+    Bignum privateKey, publicKey;
     int N = 127;
     char fileName[123];
 
@@ -80,6 +80,7 @@ int main(int argc, char **argv)
     } else if(N == 607) {
         A = createMatrix(A607_data);
     }
+    A = allocateMatrix(A);
     privateKey = createPrivateKey(N);
     publicKey = getMatrixColumn(matrixPow(A, privateKey), 0);
     sprintf(fileName, "id_bmat_%d", N);

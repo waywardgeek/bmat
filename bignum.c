@@ -83,7 +83,7 @@ void showBignum(Bignum n)
 
     for(i = 0; i < numBytes; i++) {
         word = n->data[i >> 3];
-        printf("%02x", (byte)(word >> (i & 7)));
+        printf("%02x", (byte)(word >> 8*(i & 7)));
     }
     printf("\n");
 }

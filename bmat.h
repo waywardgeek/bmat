@@ -30,6 +30,7 @@ Bignum matrixMultiplyVector(Matrix A, Bignum n);
 Matrix createMatrix(uint64 *data);
 void deleteMatrix(Matrix M);
 void powTest(void);
+Matrix allocateMatrix(Matrix oldM);
 
 // Bignum interface
 int getBignumSize(Bignum n);
