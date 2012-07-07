@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "bmat.h" // We use ARC4 for a random number generator
+#include "bmat.h"
 
 static int N; // Width of matrices.
 static int numWords; // How many uint64 words are in each row.
@@ -702,7 +702,7 @@ static bool checkPrimeOrderTheory(void)
     return true;
 }
 
-static void readRandomData(
+static void readASCIIRandomData(
     char *fileName)
 {
     FILE *file = fopen(fileName, "r");
@@ -712,7 +712,7 @@ static void readRandomData(
     numRandomValues = 1 << 20; // Lucky guess!
     randomValues = (byte *)calloc(numRandomValues, sizeof(byte));
     if(file == NULL) {
-        printf("Unable to rad random.txt\n");
+        printf("Unable to read %s\n", fileName);
         return;
     }
     c = getc(file);
@@ -735,6 +735,46 @@ static void readRandomData(
     fclose(file);
 }
 
+// Read random data from a binary file.
+static void readRandomData(
+    char *fileName)
+{
+    FILE *file = fopen(fileName, "rb");
+    int c, i = 0, j;
+    byte b;
+    unsigned numRead, totalRead = 0;
+
+    numRandomValues = 1 << 20; // Lucky guess!
+    randomValues = (byte *)calloc(numRandomValues, sizeof(byte));
+    if(file == NULL) {
+        printf("Unable to read %s\n", fileName);
+        return;
+    }
+    do {
+        numRead = fread(randomValues + totalRead, sizeof(byte),
+            numRandomValues - totalRead, file);
+        totalRead += numRead;
+    } while(numRead > 0);
+    fclose(file);
+}
+
+// Save the random data in binary.
+static void writeRandomData(char *fileName)
+{
+    FILE *file = fopen(fileName, "wb");
+
+    if(file == NULL) {
+        printf("Unable to write to file %s\n", fileName);
+        return;
+    }
+    if(fwrite(randomValues, sizeof(byte), numRandomValues, file) != numRandomValues) {
+        printf("Unable to write %s\n", fileName);
+        fclose(file);
+        return;
+    }
+    fclose(file);
+}
+
 // Initialize the matricies in the temporary queue.
 static void initQueue(void)
 {
@@ -753,7 +793,7 @@ void initMatrixModule(int width)
 
     setWidth(width);
     initParityTable();
-    readRandomData("random.txt");
+    readRandomData("random.bin");
     for(i = 0; i < sizeof(password); i++) {
         do {
             c = randomByte();

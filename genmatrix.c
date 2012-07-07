@@ -5,7 +5,7 @@ int main()
 {
     Matrix A;
 
-    initMatrixModule(607);
+    initMatrixModule(521);
     A = randomGoodMatrix();
     showMatrixInHex(A);
     return 0;

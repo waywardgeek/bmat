@@ -3,10 +3,12 @@
 // A^k*O.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include "bmat.h"
 #include "A127.h"
+#include "A521.h"
 #include "A607.h"
 
 static byte counter;
@@ -20,22 +22,6 @@ static void *runCounter(void *ptr)
         counter++;
     }
     return NULL;
-}
-
-// Taunt the poor user.
-static void printRandomIncentive(int bitsCompleted, int bitsNeeded, byte count)
-{
-    switch(count & 7) {
-    case 0: printf("Oh, yeah!  Do it to me, baby!"); break;
-    case 1: printf("Keep it comming!"); break;
-    case 2: printf("Don't let me down now..."); break;
-    case 3: printf("So close, yet so far..."); break;
-    case 4: printf("You have joined the Dark Side!  You will burn in Hell!"); break;
-    case 5: printf("I just broke a nail!"); break;
-    case 6: printf("Please... please... please keep doing that."); break;
-    case 7: printf("Almost there!  Almost there!"); break;
-    }
-    printf(" (%d of %d completed)", bitsCompleted, bitsNeeded);
 }
 
 // Ask the user to type for a while to generate a random private key.
@@ -58,7 +44,7 @@ static Bignum createPrivateKey(
             setBignumBit(key, i++, (count >> j) & 1);
             c >>= 1;
         }
-        printRandomIncentive(i, bits, count);
+        printf("%d of %d completed", i, bits);
     }
     quit = true;
     pthread_join(thread1, NULL);
@@ -72,10 +58,19 @@ int main(int argc, char **argv)
     int N = 127;
 
     if(argc == 2) {
-        if(!strcmp(argv[1], "-607")) {
+        N = atoi(argv[1]);
+        if(N == 0) {
+            printf("Usage: genkey <length>.  Length must be 127, 521, or 607.\n");
+        }
+        if(N <= 127) {
+            N = 127;
+        } else if(N <= 521) {
+            N = 521;
+        } else {
             N = 607;
         }
     }
+    printf("Using %d bit key length.\n", N);
     initMatrixModule(N);
     if(N == 127) {
         A = createMatrix(A127_data);
@@ -89,12 +84,6 @@ int main(int argc, char **argv)
     }
     if(!writeKey("id_bmat.pub", publicKey)) {
         return 1;
-    }
-    key = readKey("id_bmat", N);
-    if(bignumsEqual(privateKey, key)) {
-        printf("Passed key write/read test\n");
-    } else {
-        printf("Failed key write/read test!\n");
     }
     return 0;
 }
