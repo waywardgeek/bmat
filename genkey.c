@@ -74,6 +74,8 @@ int main(int argc, char **argv)
     initMatrixModule(N);
     if(N == 127) {
         A = createMatrix(A127_data);
+    } else if(N == 521) {
+        A = createMatrix(A521_data);
     } else if(N == 607) {
         A = createMatrix(A607_data);
     }
