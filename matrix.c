@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <stdbool.h>
 #include "bmat.h" // We use ARC4 for a random number generator
 
 static int N; // Width of matrices.
@@ -226,6 +225,17 @@ static inline int getBit(Matrix M, int row, int col)
     return (M->data[row*numWords + word] >> bit) & 1;
 }
 
+Bignum getMatrixColumn(Matrix A, int column)
+{
+    Bignum n = createBignum(0, N);
+    int i;
+
+    for(i = 0; i < N; i++) {
+        setBignumBit(n, i, getBit(A, i, column));
+    }
+    return n;
+}
+
 static Matrix zero(void)
 {
     Matrix M = newMatrix();
@@ -271,7 +281,7 @@ void showMatrixInHex(Matrix M)
     int row, word;
     uint64 *p = M->data;
 
-    printf("uint64 A%d_data = {\n", N);
+    printf("uint64 A%d_data[%d] = {\n", N, N*numWords);
     for(row = 0; row < N; row++) {
         for(word = 0; word < numWords; word++) {
             if(word != 0) {
@@ -342,6 +352,24 @@ static inline int dotProd(Matrix A, Matrix B, int row, int col)
     return value;
 }
 
+static inline int dotProdVect(Matrix A, Bignum n, int row)
+{
+    uint64 *p = A->data + row*numWords;
+    uint64 word;
+    uint64 v;
+    int value = 0;
+    int i;
+
+   
+    for(i = 0; i < numWords; i++) {
+        word = getBignumWord(n, i);
+        v = *p++ & word;
+        value ^= parityTable[(unsigned short)v] ^ parityTable[(unsigned short)(v >> 16)] ^
+            parityTable[(unsigned short)(v >> 32)] ^ parityTable[(unsigned short)(v >> 48)];
+    }
+    return value;
+}
+
 // This assumes B has been transposed, and is faster.
 static Matrix multiplyTransposed(Matrix A, Matrix B)
 {
@@ -357,9 +385,21 @@ static Matrix multiplyTransposed(Matrix A, Matrix B)
 }
 
 // This is slower, since it has to transpose N first.
-static Matrix multiply(Matrix A, Matrix B)
+Matrix matrixMultiply(Matrix A, Matrix B)
 {
     return multiplyTransposed(A, transpose(B));
+}
+
+// Multiply a matrix by a Bignum vector.  We assum it's vertical and on the right.
+Bignum matrixMultiplyVector(Matrix A, Bignum n)
+{
+    Bignum res = createBignum(0, getBignumSize(n));
+    int row;
+
+    for(row = 0; row < N; row++) {
+        setBignumBit(res, row, dotProdVect(A, n, row));
+    }
+    return res;
 }
 
 // Compute M^n.
@@ -368,13 +408,14 @@ Matrix matrixPow(
     Bignum n)
 {
     Matrix res = identity();
+    int size = getBignumSize(n);
     int i;
 
-    for(i = 0; i < n->bits; i++) {
+    for(i = 0; i < size; i++) {
         if(getBignumBit(n, i)) {
-            res = multiply(res, M);
+            res = matrixMultiply(res, M);
         }
-        M = multiply(M, M);
+        M = matrixMultiply(M, M);
     }
     return res;
 }
@@ -502,7 +543,7 @@ static bool hasGoodPowerOrder(Matrix A)
             return false;
         }
         addToHashTable(hashTable, M);
-        M = multiply(M, M);
+        M = matrixMultiply(M, M);
     }
     passed = equal(M, A);
     if(isSingular(A)) {
@@ -515,7 +556,7 @@ static bool hasGoodPowerOrder(Matrix A)
 
 // By "good", I mean the exponents A, A^2, A^4, ... A^(2^(N-1)) are unique, and
 // A^(2^N) == A.
-static Matrix randomGoodMatrix(void)
+Matrix randomGoodMatrix(void)
 {
     Matrix A;
 
@@ -534,7 +575,7 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 {
     uint64 stepSize = (uint64)(sqrt((double)maxCycle) + 0.5);
     uint64 numSteps = (uint64)(maxCycle/stepSize);
-    Matrix K = allocate(matrixPow(A, makeBignum(stepSize, 64)));
+    Matrix K = allocate(matrixPow(A, createBignum(stepSize, 64)));
     Matrix M = K;
     Matrix otherM, Atran;
     HashTable hashTable = createHashTable(numSteps);
@@ -557,7 +598,7 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
         } else {
             addToHashTable(hashTable, M);
         }
-        M = multiply(M, K);
+        M = matrixMultiply(M, K);
     }
     M = identity();
     //printf("Looking for hit.\n");
@@ -597,12 +638,12 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
     return lowestPower;
 }
 
-static void powTest(void)
+void powTest(void)
 {
     Matrix A = allocate(randomNonSingularMatrix());
     Matrix key1, key2;
-    Bignum n = makeBignum(randomUint64(), 64);
-    Bignum m = makeBignum(randomUint64(), 64);
+    Bignum n = createBignum(randomUint64(), 64);
+    Bignum m = createBignum(randomUint64(), 64);
 
     key1 = allocate(matrixPow(matrixPow(A, m), n));
     key2 = allocate(matrixPow(matrixPow(A, n), m));
@@ -622,7 +663,7 @@ static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
     uint64 i;
 
     for(i = 1; i < maxCycle; i++) {
-        A = multiply(A, origA);
+        A = matrixMultiply(A, origA);
         if(isSingular(A)) {
             printf("Singular matrix found!\n");
         }
@@ -706,6 +747,10 @@ static void initQueue(void)
 
 void initMatrixModule(int width)
 {
+    char password[1024];
+    int i;
+    byte c;
+
     setWidth(width);
     initParityTable();
     readRandomData("random.txt");
@@ -718,83 +763,5 @@ void initMatrixModule(int width)
     password[sizeof(password) - 1] = '\0';
     initKey(password, NULL, 0);
     throwAwaySomeBytes(DISCARD_BYTES);
-    powTest();
-}
-
-#if 0
-int main()
-{
-    Matrix A;
-    uint64 i;
-    uint64 length, length2, maxLength = 0;
-    uint64 equalMax = 0;
-    uint64 total = 1000;
-    uint64 maxCycle;
-    char password[1024];
-    byte c;
-
-    setWidth(127);
-    initParityTable();
-    readRandomData("random.txt");
-    for(i = 0; i < sizeof(password); i++) {
-        do {
-            c = randomByte();
-        } while(c == '\0');
-        password[i] = c;
-    }
-    password[sizeof(password) - 1] = '\0';
-    initKey(password, NULL, 0);
-    throwAwaySomeBytes(DISCARD_BYTES);
-
     initQueue();
-    powTest();
-    A = randomGoodMatrix();
-    showMatrixInHex(A);
-    return 0;
-
-    for(N = 31; N <= 31; N++) {
-        if(checkPrimeOrderTheory()) {
-            printf("N %d passed\n", N);
-        } else {
-            printf("N %d failed\n", N);
-        }
-    }
-
-    /*
-    for(N = 40; N <= 40; N++) {
-        maxLength = 0;
-        maxCycle = 1LL << (N+1);
-        for(i = 0; i < total && maxLength != (1LL << N) - 1LL; i++) {
-            printf("Try %lld\n", i);
-            A = allocate(randomNonSingularMatrix());
-            //length = simpleFindCycleLength(A, maxCycle);
-            length = findCycleLength(A, maxCycle);
-            //length = simpleFindCycleLength(A, maxCycle);
-            if(length > maxLength) {
-                maxLength = length;
-            }
-            deleteMatrix(A);
-        }
-        printf("For N=%lld, length=%lld, found in %lld tries\n", N, maxLength, i);
-        showMatrix(A);
-        //if(length != length2) {
-            //length2 = findCycleLength(A, maxCycle);
-            //printf("Errors in findCycleLength!\n");
-        //}
-        //if(maxLength < length) {
-            //maxLength = length;
-            //equalMax = 0;
-        //}
-        //if(length == maxLength) {
-            //equalMax++;
-        //}
-        //if((i % (total/100)) == 0) {
-            //printf("%lld: maxLength=%lld, length = %lld\n", i, maxLength, length);
-        //}
-        //deleteMatrix(A);
-    }
-    printf("Max: %lld, percent equal to max: %f\n", maxLength, (100.0*equalMax)/total);
-    */
-    return 0;
 }
-#endif

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "boolenc.h"
+#include "bmat.h"
 
 static byte temp;
 #define swap(a, b) (temp = (a), (a) = (b), (b) = temp)

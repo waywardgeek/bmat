@@ -1,4 +1,4 @@
-uint64 A127_data = {
+uint64 A127_data[127*2] = {
 0x2ab0758644b36c1LL, 0x177d45252d6ad7b1LL,
 0x96dadba6e7974a2bLL, 0x483db687a1efa88eLL,
 0x49707118b2a723caLL, 0x50ff100d08ea041aLL,
