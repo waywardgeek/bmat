@@ -56,6 +56,7 @@ int main(int argc, char **argv)
     Matrix A;
     Bignum privateKey, publicKey, key;
     int N = 127;
+    char fileName[123];
 
     if(argc == 2) {
         N = atoi(argv[1]);
@@ -81,10 +82,12 @@ int main(int argc, char **argv)
     }
     privateKey = createPrivateKey(N);
     publicKey = getMatrixColumn(matrixPow(A, privateKey), 0);
-    if(!writeKey("id_bmat", privateKey)) {
+    sprintf(fileName, "id_bmat_%d", N);
+    if(!writeKey(fileName, privateKey)) {
         return 1;
     }
-    if(!writeKey("id_bmat.pub", publicKey)) {
+    sprintf(fileName, "id_bmat_%d.pub", N);
+    if(!writeKey(fileName, publicKey)) {
         return 1;
     }
     return 0;
