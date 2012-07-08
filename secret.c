@@ -32,7 +32,6 @@ int main(int argc, char **argv)
     }
     A = matrixPow(A, myPriv);
     sharedKey = matrixMultiplyVector(A, theirPub);
-    printf("Shared secret key between you (%s) and %s is\n", argv[1], argv[2]);
     showBignum(sharedKey);
     return 0;
 }

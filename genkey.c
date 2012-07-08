@@ -85,22 +85,22 @@ int main(int argc, char **argv)
     A = allocateMatrix(A);
     privateKey = createPrivateKey(N);
     publicKey = getMatrixColumn(matrixPow(A, privateKey), 0);
-    sprintf(fileName, "id_bmat_%d", N);
+    sprintf(fileName, "id_%d.priv", N);
     if(!writeKey(fileName, privateKey, true)) {
         return 1;
     }
     readPrivateKey = readKey(fileName, true);
-    if(!bignumsEqual(privateKey, readPrivateKey)) {
+    if(readPrivateKey == NULL || !bignumsEqual(privateKey, readPrivateKey)) {
         printf("Unable to read back private key\n");
         return 1;
     }
     printf("Wrote private key %s\n", fileName);
-    sprintf(fileName, "id_bmat_%d.pub", N);
+    sprintf(fileName, "id_%d.pub", N);
     if(!writeKey(fileName, publicKey, false)) {
         return 1;
     }
     readPublicKey = readKey(fileName, false);
-    if(!bignumsEqual(publicKey, readPublicKey)) {
+    if(readPublicKey == NULL || !bignumsEqual(publicKey, readPublicKey)) {
         printf("Unable to read back private key\n");
         return 1;
     }

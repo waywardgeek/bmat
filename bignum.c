@@ -127,16 +127,19 @@ Bignum readKey(char *fileName, bool isPrivateKey)
     FILE *file = fopen(fileName, "rb");
     byte buffer[MAX_KEY_LENGTH];
     bool fileIsPrivateKey;
-    unsigned numRead, bits;
+    unsigned numRead, pos = 0, bits;
 
     if(file == NULL) {
         printf("Unable to read from file %s.\n", fileName);
         return NULL;
     }
-    numRead = fread(buffer, sizeof(byte), MAX_KEY_LENGTH, file);
+    do {
+        numRead = fread(buffer + pos, sizeof(byte), MAX_KEY_LENGTH, file);
+        pos += numRead;
+    } while(numRead > 0);
     fclose(file);
-    bits = (((unsigned)buffer[0]) | ((unsigned)buffer[1] << 8)) & 0x7f;
-    if(numRead != (bits + 7)/8 + 2) {
+    bits = ((unsigned)buffer[0]) | (((unsigned)buffer[1] & 0x7) << 8);
+    if(pos != (bits + 7)/8 + 2) {
         printf("Key file %s has incorrect size.\n", fileName);
         return NULL;
     }
