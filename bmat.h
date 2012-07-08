@@ -31,6 +31,7 @@ Matrix createMatrix(uint64 *data);
 void deleteMatrix(Matrix M);
 void powTest(void);
 Matrix allocateMatrix(Matrix oldM);
+extern byte parityTable[1 << 16];
 
 // Bignum interface
 int getBignumSize(Bignum n);
@@ -39,7 +40,15 @@ void setBignumBit(Bignum n, int bit, bool value);
 byte getBignumByte(Bignum n, int i);
 uint64 getBignumWord(Bignum n, int i);
 Bignum createBignum(uint64 value, int bits);
-bool writeKey(char *fileName, Bignum key);
-Bignum readKey(char *fileName, int bits);
+bool writeKey(char *fileName, Bignum key, bool isPrivateKey);
+Bignum readKey(char *fileName, bool isPrivateKey);
 bool bignumsEqual(Bignum n, Bignum m);
 void showBignum(Bignum n);
+void bignumSetIsPrivateKey(Bignum n);
+void deleteBignum(Bignum n);
+
+// PRNG random number generaor
+void initRandomModule(void);
+byte randomByte(void);
+bool randomBool(void);
+uint64 randomUint64(void);

@@ -7,16 +7,10 @@
 static int N; // Width of matrices.
 static int numWords; // How many uint64 words are in each row.
 
-// This is one megabyte of random data from 2012-07-06 at random.org
-static byte *randomValues;
-static uint64 numRandomValues;
-static uint64 nextRandomValue = 0;
-static int nextRandomBit = 0;
-
 static Matrix firstFreeMatrix = NULL; // I'll maintain a free list of matricies.
 
 // This table is for computing the parity of bits of 16-bit ints.
-static byte parityTable[1 << 16];
+byte parityTable[1 << 16];
 
 // This is a queue of temporary matrices, which get reused after a while.  To
 // allocate a matrix permanently, call copy.
@@ -40,42 +34,6 @@ static void setWidth(int width)
 {
     N = width;
     numWords = (N + 63)/64;
-}
-
-// Hopefully random enough function, using ARC4 XORed on top of some actual
-// random data, but the random data gets reused if there's not enough of it.
-static inline byte randomByte(void)
-{
-    if(nextRandomValue == numRandomValues) {
-        nextRandomValue = 0;
-    }
-    nextRandomBit = 0;
-    return hashChar(randomValues[nextRandomValue++]);
-}
-
-static inline bool randomBool(void)
-{
-    if(nextRandomBit == 8) {
-        nextRandomBit = 0;
-        nextRandomValue++;
-        if(nextRandomValue == numRandomValues) {
-            nextRandomValue = 0;
-        }
-    }
-    return parityTable[hashChar(0)] ^
-        ((randomValues[nextRandomValue] >> nextRandomBit++) & 1);
-}
-
-// Return 8 random bytes in a uint64.
-static inline uint64 randomUint64(void)
-{
-    uint64 value = 0LL;
-    int i;
-
-    for(i = 0; i < 8; i++) {
-        value |= (uint64)(randomByte()) << 8*i;
-    }
-    return value;
 }
 
 // Hash table functions.
@@ -673,21 +631,34 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
 
 void powTest(void)
 {
-    Matrix A = allocateMatrix(randomNonSingularMatrix());
-    Matrix key1, key2;
-    Bignum n = createBignum(randomUint64(), 64);
-    Bignum m = createBignum(randomUint64(), 64);
+    Matrix A, Am, An, key1M, key2M;
+    Bignum m, n, key1V, key2V;
 
-    key1 = allocateMatrix(matrixPow(matrixPow(A, m), n));
-    key2 = allocateMatrix(matrixPow(matrixPow(A, n), m));
-    if(equal(key1, key2)) {
-        printf("Passed pow test.\n");
-    } else {
-        printf("Failed pow test.\n");
+    initRandomModule();
+    A = allocateMatrix(randomGoodMatrix());
+    m = createBignum(randomUint64(), N);
+    n = createBignum(randomUint64(), N);
+
+    Am = allocateMatrix(matrixPow(A, m));
+    An = allocateMatrix(matrixPow(A, n));
+    key1M = allocateMatrix(matrixPow(Am, n));
+    key2M = allocateMatrix(matrixPow(An, m));
+    if(!equal(key1M, key2M)) {
+        printf("Failed A^(m*n) test.\n");
     }
-    deleteMatrix(key1);
-    deleteMatrix(key2);
+    key1V = matrixMultiplyVector(Am, n);
+    key2V = matrixMultiplyVector(Am, n);
+    if(!bignumsEqual(key1V, key2V)) {
+        printf("Failed A^(m+n) test.\n");
+    }
+    deleteMatrix(key1M);
+    deleteMatrix(key2M);
     deleteMatrix(A);
+    deleteMatrix(Am);
+    deleteMatrix(Am);
+    deleteBignum(key1V);
+    deleteBignum(key2V);
+    printf("Passed pow test.\n");
 }
 
 static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
@@ -735,77 +706,6 @@ static bool checkPrimeOrderTheory(void)
     return true;
 }
 
-static void readASCIIRandomData(
-    char *fileName)
-{
-    FILE *file = fopen(fileName, "r");
-    int c, i = 0, j;
-    byte b;
-
-    numRandomValues = 1 << 20; // Lucky guess!
-    randomValues = (byte *)calloc(numRandomValues, sizeof(byte));
-    if(file == NULL) {
-        printf("Unable to read %s\n", fileName);
-        return;
-    }
-    c = getc(file);
-    while(c != EOF) {
-        if(i == numRandomValues) {
-            numRandomValues <<= 1;
-            randomValues = (byte *)realloc(randomValues, numRandomValues*sizeof(byte));
-        }
-        b = 0;
-        for(j = 0; c != EOF && j < 8; j++) {
-            c = getc(file);
-            if(c == '1') {
-                b |= 1 << j;
-            }
-        }
-        if(c != EOF) {
-            randomValues[i++] = b;
-        }
-    }
-    fclose(file);
-}
-
-// Read random data from a binary file.
-static void readRandomData(
-    char *fileName)
-{
-    FILE *file = fopen(fileName, "rb");
-    unsigned numRead, totalRead = 0;
-
-    numRandomValues = 1 << 20; // Lucky guess!
-    randomValues = (byte *)calloc(numRandomValues, sizeof(byte));
-    if(file == NULL) {
-        printf("Unable to read %s\n", fileName);
-        return;
-    }
-    do {
-        numRead = fread(randomValues + totalRead, sizeof(byte),
-            numRandomValues - totalRead, file);
-        totalRead += numRead;
-    } while(numRead > 0);
-    fclose(file);
-}
-
-// Save the random data in binary.
-static void writeRandomData(char *fileName)
-{
-    FILE *file = fopen(fileName, "wb");
-
-    if(file == NULL) {
-        printf("Unable to write to file %s\n", fileName);
-        return;
-    }
-    if(fwrite(randomValues, sizeof(byte), numRandomValues, file) != numRandomValues) {
-        printf("Unable to write %s\n", fileName);
-        fclose(file);
-        return;
-    }
-    fclose(file);
-}
-
 // Initialize the matricies in the temporary queue.
 static void initQueue(void)
 {
@@ -818,21 +718,7 @@ static void initQueue(void)
 
 void initMatrixModule(int width)
 {
-    char password[1024];
-    int i;
-    byte c;
-
     setWidth(width);
     initParityTable();
-    readRandomData("random.bin");
-    for(i = 0; i < sizeof(password); i++) {
-        do {
-            c = randomByte();
-        } while(c == '\0');
-        password[i] = c;
-    }
-    password[sizeof(password) - 1] = '\0';
-    initKey(password, NULL, 0);
-    throwAwaySomeBytes(DISCARD_BYTES);
     initQueue();
 }

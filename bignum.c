@@ -3,9 +3,12 @@
 #include <string.h>
 #include "bmat.h"
 
+#define MAX_KEY_LENGTH (1 << 14)
+
 struct BignumStruct {
     uint64 *data;
     int bits;
+    bool isPrivate;
 };
 
 bool getBignumBit(Bignum n, int bit)
@@ -88,12 +91,13 @@ void showBignum(Bignum n)
     printf("\n");
 }
 
-// Write the key in binary to the file.
-bool writeKey(char *fileName, Bignum key)
+// Write the key in binary to the file.  The first 15 bits encode key length,
+// the 16th bit is the private key flag, and the rest is the key.
+bool writeKey(char *fileName, Bignum key, bool isPrivate)
 {
     FILE *file = fopen(fileName, "wb");
     int bits = getBignumSize(key);
-    int numBytes = (bits + 7)/8;
+    int numBytes = (bits + 7)/8 + 2; // First two bytes encode length in bits.
     byte buffer[numBytes];
     int i;
 
@@ -101,8 +105,13 @@ bool writeKey(char *fileName, Bignum key)
         printf("Unable to write to file %s.\n", fileName);
         return false;
     }
-    for(i = 0; i < numBytes; i++) {
-        buffer[i] = getBignumByte(key, i);
+    buffer[0] = (byte)key->bits;
+    buffer[1] = (byte)(key->bits >> 8);
+    if(isPrivate) {
+        buffer[1] |= 0x80;
+    }
+    for(i = 0; i < numBytes - 2; i++) {
+        buffer[i + 2] = getBignumByte(key, i);
     }
     if(fwrite(buffer, sizeof(byte), numBytes, file) != numBytes) {
         printf("Unable to write key to %s\n", fileName);
@@ -113,25 +122,34 @@ bool writeKey(char *fileName, Bignum key)
 }
 
 // Read the key in binary to the file.
-Bignum readKey(char *fileName, int bits)
+Bignum readKey(char *fileName, bool isPrivateKey)
 {
     FILE *file = fopen(fileName, "rb");
-    int numBytes = (bits + 7) >> 3;
-    byte buffer[numBytes];
-    int numRead;
+    byte buffer[MAX_KEY_LENGTH];
+    bool fileIsPrivateKey;
+    unsigned numRead, bits;
 
     if(file == NULL) {
         printf("Unable to read from file %s.\n", fileName);
         return NULL;
     }
-    numRead = fread(buffer, sizeof(byte), numBytes, file);
-    if(numRead != numBytes) {
-        printf("Unable to read all the bytes required from %s", fileName);
-        fclose(file);
+    numRead = fread(buffer, sizeof(byte), MAX_KEY_LENGTH, file);
+    fclose(file);
+    bits = (((unsigned)buffer[0]) | ((unsigned)buffer[1] << 8)) & 0x7f;
+    if(numRead != (bits + 7)/8 + 2) {
+        printf("Key file %s has incorrect size.\n", fileName);
         return NULL;
     }
-    fclose(file);
-    return createBignumFromBytes(buffer, bits);
+    fileIsPrivateKey = (buffer[1] >> 7) != 0;
+    if(fileIsPrivateKey && !isPrivateKey) {
+        printf("Trying to read public key from private key file %s\n", fileName);
+        return NULL;
+    }
+    if(!fileIsPrivateKey && isPrivateKey) {
+        printf("Trying to read private key from public key file %s\n", fileName);
+        return NULL;
+    }
+    return createBignumFromBytes(buffer + 2, bits);
 }
 
 // Check if to bignums are equal.
@@ -149,4 +167,10 @@ bool bignumsEqual(Bignum n, Bignum m)
         }
     }
     return true;
+}
+
+// Set the isPrivate flag on the bignum.
+void bignumSetIsPrivateKey(Bignum n)
+{
+    n->isPrivate = true;
 }

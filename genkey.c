@@ -14,7 +14,7 @@
 static byte counter;
 
 static byte counter;
-static bool quit = false;
+static volatile bool quit = false;
 
 static void *runCounter(void *ptr)
 {
@@ -46,6 +46,7 @@ static Bignum createPrivateKey(
         }
         printf("%d of %d completed", i, bits);
     }
+    printf("\nDone generating random data.  Building public key...\n");
     quit = true;
     pthread_join(thread1, NULL);
     return key;
@@ -55,6 +56,7 @@ int main(int argc, char **argv)
 {
     Matrix A;
     Bignum privateKey, publicKey;
+    Bignum readPrivateKey, readPublicKey;
     int N = 127;
     char fileName[123];
 
@@ -84,12 +86,24 @@ int main(int argc, char **argv)
     privateKey = createPrivateKey(N);
     publicKey = getMatrixColumn(matrixPow(A, privateKey), 0);
     sprintf(fileName, "id_bmat_%d", N);
-    if(!writeKey(fileName, privateKey)) {
+    if(!writeKey(fileName, privateKey, true)) {
         return 1;
     }
+    readPrivateKey = readKey(fileName, true);
+    if(!bignumsEqual(privateKey, readPrivateKey)) {
+        printf("Unable to read back private key\n");
+        return 1;
+    }
+    printf("Wrote private key %s\n", fileName);
     sprintf(fileName, "id_bmat_%d.pub", N);
-    if(!writeKey(fileName, publicKey)) {
+    if(!writeKey(fileName, publicKey, false)) {
         return 1;
     }
+    readPublicKey = readKey(fileName, false);
+    if(!bignumsEqual(publicKey, readPublicKey)) {
+        printf("Unable to read back private key\n");
+        return 1;
+    }
+    printf("Wrote public key %s\n", fileName);
     return 0;
 }
