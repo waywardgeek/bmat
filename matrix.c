@@ -188,7 +188,7 @@ static void setRow(Matrix A, int row, Bignum n)
     memcpy(A->data + row*numWords, getBignumData(n), numWords*sizeof(uint64));
 }
 
-static Bignum getRow(Matrix A, int row)
+Bignum getMatrixRow(Matrix A, int row)
 {
     Bignum n = createBignum(0, N);
 
@@ -823,7 +823,7 @@ Matrix reconstructMatrix(Matrix G, Bignum h)
     setRow(R, 0, h);
     setRow(L, 0, createBignum(1, N));
     while(i < N) {
-        g = getRow(M, 0);
+        g = getMatrixRow(M, 0);
         v = vectorMultiplyMatrix(g, M);
         //if(linearlyIndependent(H, i, v)) {
             setRow(L, i, h);

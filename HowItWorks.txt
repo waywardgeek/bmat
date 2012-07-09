@@ -1,3 +1,8 @@
+At the moment, it doesn't!  I believe it is possible to recover the entire
+user's matrix from just it's left column, and if this turns out to be true,
+we'll have to use G^m^N, the way it's normally done, rather than G^(m+n) which
+an attacker can easily compute from G^m and G^n.
+
 Here's a key exchange scheme I've come up with.
 
 Let G be an NxN random "Boolean matrix".  For example, we could choose G =

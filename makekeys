@@ -1,0 +1,13 @@
+#!/bin/bash
+
+sizes="2 3 5 7 13 17 19 31 61 89 107 127 521"
+people="alice bob eve"
+
+for size in $sizes; do
+    for person in $people; do
+        echo $person $size
+        genkey -r $size
+        mv id_${size}.priv keys/${person}_$size.priv
+        mv id_${size}.pub keys/${person}_$size.pub
+    done
+done

@@ -33,6 +33,15 @@ byte getBignumByte(Bignum n, int i)
     return (byte)(n->data[wordPos] >> bytePos*8);
 }
 
+void setBignumByte(Bignum n, int i, byte value)
+{
+    int wordPos = i >> 3;
+    int bytePos = i & 7;
+
+    n->data[wordPos] &=  ~((uint64)0xff << bytePos*8);
+    n->data[wordPos] |= ((uint64)value) << bytePos*8;
+}
+
 uint64 getBignumWord(Bignum n, int i)
 {
     return n->data[i];

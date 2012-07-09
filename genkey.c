@@ -1,6 +1,6 @@
 // Get random data from user as he types on keyboard randomly.  Once we have 127
 // bits worth, save this as his private key k, and compute his public key as
-// G^k*O.
+// O*G^k.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,8 +20,31 @@ static void *runCounter(void *ptr)
     return NULL;
 }
 
+// Generate a private key from random data in /dev/random.
+static Bignum createPrivateKeyFromDevRandom(
+    int bits)
+{
+    Bignum n;
+    FILE *randFile = fopen("/dev/urandom", "r");
+    int i, remaining;
+
+    if(randFile == NULL) {
+        printf("Unable to open random number source.\n");
+        return NULL;
+    }
+    n = createBignum(0, bits);
+    for(i = 0; i < bits/8; i++) {
+        setBignumByte(n, i, getc(randFile));
+    }
+    remaining = bits - (bits/8)*8;
+    if(remaining > 0) {
+        setBignumByte(n, i, getc(randFile) >> (8 - remaining));
+    }
+    return n;
+}
+
 // Ask the user to type for a while to generate a random private key.
-static Bignum createPrivateKey(
+static Bignum createPrivateKeyFromKeyboard(
     int bits)
 {
     Bignum key = createBignum(0, bits);
@@ -54,18 +77,32 @@ int main(int argc, char **argv)
     Bignum privateKey, publicKey;
     Bignum readPrivateKey, readPublicKey;
     int N = 127;
+    int xArg = 1;
     char fileName[123];
+    bool useDevRandom = false;
 
-    if(argc == 2) {
-        N = atoi(argv[1]);
+    
+    while(xArg < argc && argv[xArg][0] == '-') {
+        if(!strcmp(argv[xArg], "-r")) {
+            useDevRandom = true;
+        }
+        xArg++;
+    }
+    if(xArg + 1 == argc) {
+        N = atoi(argv[xArg]);
         if(N == 0) {
-            printf("Usage: genkey <length>.  Length must be 127, 521, or 607.\n");
+            printf("Usage: genkey [-r] <length>.\n"
+               "    -r : Use /dev/random rather than keyboard input for random data\n");
         }
     }
     printf("Using %d bit key length.\n", N);
     G = getGenerator(N);
-    privateKey = createPrivateKey(N);
-    publicKey = getMatrixColumn(matrixPow(G, privateKey), 0);
+    if(useDevRandom) {
+        privateKey = createPrivateKeyFromDevRandom(N);
+    } else {
+        privateKey = createPrivateKeyFromKeyboard(N);
+    }
+    publicKey = getMatrixRow(matrixPow(G, privateKey), 0);
     sprintf(fileName, "id_%d.priv", N);
     if(!writeKey(fileName, privateKey, true)) {
         return 1;
