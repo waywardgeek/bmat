@@ -73,7 +73,7 @@ static Bignum createPrivateKeyFromKeyboard(
 
 int main(int argc, char **argv)
 {
-    Matrix G;
+    Matrix G, H;
     Bignum privateKey, publicKey;
     Bignum readPrivateKey, readPublicKey;
     int N = 127;
@@ -95,14 +95,17 @@ int main(int argc, char **argv)
                "    -r : Use /dev/random rather than keyboard input for random data\n");
         }
     }
-    printf("Using %d bit key length.\n", N);
     G = getGenerator(N);
+    N = getMatrixSize();
+    printf("Using %d bit key length.\n", N);
     if(useDevRandom) {
         privateKey = createPrivateKeyFromDevRandom(N);
     } else {
         privateKey = createPrivateKeyFromKeyboard(N);
     }
-    publicKey = getMatrixRow(matrixPow(G, privateKey), 0);
+    H = matrixPow(G, privateKey);
+    showMatrixInHex(H);
+    publicKey = getMatrixRow(H, 0);
     sprintf(fileName, "id_%d.priv", N);
     if(!writeKey(fileName, privateKey, true)) {
         return 1;

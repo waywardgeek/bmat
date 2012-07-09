@@ -5,7 +5,7 @@
 
 int main(int argc, char **argv)
 {
-    Matrix A;
+    Matrix G, theirPubM, sharedM;
     Bignum myPriv, theirPub, sharedKey;
     int N;
 
@@ -19,9 +19,10 @@ int main(int argc, char **argv)
         printf("Keys are not the same size, and can not be used together.\n");
         return 1;
     }
-    A = getGenerator(N);
-    A = matrixPow(A, myPriv);
-    sharedKey = matrixMultiplyVector(A, theirPub);
+    G = getGenerator(N);
+    theirPubM = reconstructMatrix(G, theirPub);
+    sharedM = matrixPow(theirPubM, myPriv);
+    sharedKey = getMatrixRow(sharedM, 0);
     showBignum(sharedKey);
     return 0;
 }

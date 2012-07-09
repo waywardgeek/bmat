@@ -27,11 +27,13 @@ Bignum getMatrixColumn(Matrix A, int column);
 Bignum getMatrixRow(Matrix A, int row);
 Matrix matrixMultiply(Matrix A, Matrix B);
 Matrix matrixPow(Matrix A, Bignum n);
+int getMatrixSize(void);
 Bignum matrixMultiplyVector(Matrix A, Bignum n);
 Matrix createMatrix(uint64 *data);
 void deleteMatrix(Matrix M);
 void powTest(void);
 Matrix allocateMatrix(Matrix oldM);
+Matrix reconstructMatrix(Matrix G, Bignum h);
 extern byte parityTable[1 << 16];
 
 // Bignum interface

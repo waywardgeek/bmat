@@ -30,6 +30,11 @@ struct HashTableStruct {
     Matrix *matrices;
 };
 
+int getMatrixSize(void)
+{
+    return N;
+}
+
 static void setWidth(int width)
 {
     N = width;
@@ -402,7 +407,7 @@ static void xorRowData(
     int i;
 
     for(i = 0; i < numWords; i++) {
-        *destRow |= *sourceRow;
+        *destRow ^= *sourceRow;
     }
 }
 
@@ -542,7 +547,7 @@ Matrix inverse(Matrix M)
             xorRow(A, lowerRow, row);
             xorRow(I, lowerRow, row);
         }
-        for(lowerRow = row + 1; lowerRow < N; row++) {
+        for(lowerRow = row + 1; lowerRow < N; lowerRow++) {
             if(getBit(A, lowerRow, row)) {
                 xorRow(A, row, lowerRow);
                 xorRow(I, row, lowerRow);
@@ -810,27 +815,33 @@ void initMatrixModule(int width)
 // We can compute hG, and restrict values of unknowns in H with these N linear
 // equations.  Repeat this with G^2, G^3, ... until we have N - 1 linearly
 // independent equations.  Then, solve for H.
+// h is his public key, the first row of H
+// m is the first row of the current power of G, called M.
+// h*M = m*H
+//     compute v = h*M
+//     enter constraints v == m*H as rows in V and C
+// V = C*H
+// H = C-1*V
 Matrix reconstructMatrix(Matrix G, Bignum h)
 {
-    Matrix H = zero();
-    Matrix R = zero(); // We will store various values of g here
-    Matrix L = zero(); // We will store various values of gH (computed as hG) here
+    Matrix V = allocateMatrix(zero()); // We will store various values of g here
+    Matrix C = allocateMatrix(zero()); // We will store various values of gH (computed as hG) here
     Matrix M = copy(G);
-    Bignum g, v;
+    Bignum m, v;
     int i = 1;
 
-    setRow(H, 0, h);
-    setRow(R, 0, h);
-    setRow(L, 0, createBignum(1, N));
+    // First constraint is just h=O*H
+    setRow(C, 0, createBignum(1, N));
+    setRow(V, 0, h);
     while(i < N) {
-        g = getMatrixRow(M, 0);
-        v = vectorMultiplyMatrix(g, M);
+        m = getMatrixRow(M, 0);
+        v = vectorMultiplyMatrix(h, M);
         //if(linearlyIndependent(H, i, v)) {
-            setRow(L, i, h);
-            setRow(R, i, v);
+            setRow(V, i, v);
+            setRow(C, i, m);
             i++;
             M = matrixMultiply(M, G);
         //}
     }
-    return matrixMultiply(L, inverse(R));
+    return matrixMultiply(inverse(C), V);
 }
