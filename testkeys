@@ -1,24 +1,29 @@
 #!/bin/bash
-people="alice bob eve"
-for guy1 in $people; do
-    for guy2 in $people; do
-        key1=`secret keys/${guy1}_127.priv keys/${guy2}_127.pub`
-        key2=`secret keys/${guy2}_127.priv keys/${guy1}_127.pub`
-        echo $key1
-        echo $key2
-        if [ $key1 != $key2 ]; then
-            echo "Failed for $guy1 and $guy2"
-            exit 1
-        fi
-        echo "Passed $guy1 $guy2 for 127"
-        key1=`secret keys/${guy1}_521.priv keys/${guy2}_521.pub`
-        key2=`secret keys/${guy2}_521.priv keys/${guy1}_521.pub`
-        echo $key1
-        echo $key2
-        if [ $key1 != $key2 ]; then
-            echo "Failed for $guy1 and $guy2"
-            exit 1
-        fi
-        echo "Passed $guy1 $guy2 for 521"
+people=`\ls keys | sed 's/keys\///
+    s/_.*//' | sort -u`
+sizes=`\ls keys | sed 's/.*_//
+    s/\..*//' | sort -un`
+for size in $sizes; do
+    for per1 in $people; do
+        start=0
+        for per2 in $people; do
+            if [ $per1 == $per2 ]; then
+                start=1
+            elif [ $start == 1 ]; then
+                priv1=keys/${per1}_${size}.priv
+                priv2=keys/${per1}_${size}.priv
+                pub1=keys/${per1}_${size}.pub
+                pub2=keys/${per1}_${size}.pub
+                if [ -e $priv1 -a -e $priv2 -a -e $pub1 -a -e $pub2 ]; then
+                    key1=`secret $priv1 $pub2`
+                    key2=`secret $priv2 $pub1`
+                    if [ $key1 != $key2 ]; then
+                        echo "Failed for $privKey and $pubKey"
+                        exit 1
+                    fi
+                fi
+                echo "Passed ${per1}_${size} and ${per2}_${size}"
+            fi
+        done
     done
 done
