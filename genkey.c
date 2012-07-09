@@ -104,7 +104,6 @@ int main(int argc, char **argv)
         privateKey = createPrivateKeyFromKeyboard(N);
     }
     H = matrixPow(G, privateKey);
-    showMatrixInHex(H);
     publicKey = getMatrixRow(H, 0);
     sprintf(fileName, "id_%d.priv", N);
     if(!writeKey(fileName, privateKey, true)) {

@@ -1,8 +1,3 @@
-At the moment, it doesn't!  I believe it is possible to recover the entire
-user's matrix from just it's left column, and if this turns out to be true,
-we'll have to use G^m^N, the way it's normally done, rather than G^(m+n) which
-an attacker can easily compute from G^m and G^n.
-
 Here's a key exchange scheme I've come up with.
 
 Let G be an NxN random "Boolean matrix".  For example, we could choose G =
@@ -67,13 +62,13 @@ Here's the key exchange algorithm...
 - Alice computes (G^m)*O (This is an N-bit vertical vector).  She transmits this
   publicly to Bob.
 - Bob computes (G^n)*O and transmits it to Alice.
-- Alice multiplies the vector from Bob by (G^m), which only she knows.  The
-  result is (G^m)*(G^n)*O = G^(m+n)*O
-- Bob multiplies the vector from Alice by (G^n), which only he knows.  The
-  result is (G^n)*(G^m)*O = G^(m+n)*O
+- Alice reconstructs Bob's entire matrix G^n from the first row published by
+  Bob.  Then, she raises it to the power of m to get (G^n)^m - G^(m*n). 
+- Bob reconstructs Alice's entire matrix G^m from the first row published by
+  Alice.  Then, she raises it to the power of n to get (G^n)^m - G^(m*n). 
+- Bob and Alice use the first row of G^(m*n) as their shared secret.
 
-Now Alice and Bob both share the secret key G^(m+n)*O.  They then use this key
-to talk using AES or some other shared-private-key algorithm.
+They then use this key to talk using AES or some other shared-private-key algorithm.
 
 This can also be used for in public key encryption, where anyone can send
 encrypted documents to Bob anonymously, and only Bob can decrypt them.  However,
