@@ -407,7 +407,7 @@ static void xorRowData(
     int i;
 
     for(i = 0; i < numWords; i++) {
-        *destRow ^= *sourceRow;
+        *destRow++ ^= *sourceRow++;
     }
 }
 

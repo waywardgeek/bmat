@@ -11,18 +11,20 @@ for size in $sizes; do
                 start=1
             elif [ $start == 1 ]; then
                 priv1=keys/${per1}_${size}.priv
-                priv2=keys/${per1}_${size}.priv
+                priv2=keys/${per2}_${size}.priv
                 pub1=keys/${per1}_${size}.pub
-                pub2=keys/${per1}_${size}.pub
+                pub2=keys/${per2}_${size}.pub
                 if [ -e $priv1 -a -e $priv2 -a -e $pub1 -a -e $pub2 ]; then
                     key1=`secret $priv1 $pub2`
+                    key2=`secret $priv2 $pub1`
                     key2=`secret $priv2 $pub1`
                     if [ $key1 != $key2 ]; then
                         echo "Failed for $privKey and $pubKey"
                         exit 1
                     fi
+                    echo "Passed ${per1}_${size} and ${per2}_${size}"
+                    echo $key1
                 fi
-                echo "Passed ${per1}_${size} and ${per2}_${size}"
             fi
         done
     done
