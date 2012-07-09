@@ -1,0 +1,5 @@
+uint64 G3_data[3] = {
+0x7LL,
+0x1LL,
+0x5LL,
+};

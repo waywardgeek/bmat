@@ -1,17 +1,13 @@
 // Get random data from user as he types on keyboard randomly.  Once we have 127
 // bits worth, save this as his private key k, and compute his public key as
-// A^k*O.
+// G^k*O.
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include "bmat.h"
-#include "A127.h"
-#include "A521.h"
-#include "A607.h"
-
-static byte counter;
+#include "generators.h"
 
 static byte counter;
 static volatile bool quit = false;
@@ -54,7 +50,7 @@ static Bignum createPrivateKey(
 
 int main(int argc, char **argv)
 {
-    Matrix A;
+    Matrix G;
     Bignum privateKey, publicKey;
     Bignum readPrivateKey, readPublicKey;
     int N = 127;
@@ -65,26 +61,11 @@ int main(int argc, char **argv)
         if(N == 0) {
             printf("Usage: genkey <length>.  Length must be 127, 521, or 607.\n");
         }
-        if(N <= 127) {
-            N = 127;
-        } else if(N <= 521) {
-            N = 521;
-        } else {
-            N = 607;
-        }
     }
     printf("Using %d bit key length.\n", N);
-    initMatrixModule(N);
-    if(N == 127) {
-        A = createMatrix(A127_data);
-    } else if(N == 521) {
-        A = createMatrix(A521_data);
-    } else if(N == 607) {
-        A = createMatrix(A607_data);
-    }
-    A = allocateMatrix(A);
+    G = getGenerator(N);
     privateKey = createPrivateKey(N);
-    publicKey = getMatrixColumn(matrixPow(A, privateKey), 0);
+    publicKey = getMatrixColumn(matrixPow(G, privateKey), 0);
     sprintf(fileName, "id_%d.priv", N);
     if(!writeKey(fileName, privateKey, true)) {
         return 1;

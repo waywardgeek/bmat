@@ -111,7 +111,7 @@ class Matrix:
         A = self.copy()
         # Start with A and I, and do Gaussian elimination to convert A to I,
         # while doing the same operations to the other matrix.
-        # Do the row additions tcolo zero out lower left of A:
+        # Do the row additions to zero out lower left of A:
         for row in range(A.rows):
             lowerRow = A.findNonZeroRow(row)
             if lowerRow == -1:

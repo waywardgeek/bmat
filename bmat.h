@@ -46,6 +46,7 @@ bool bignumsEqual(Bignum n, Bignum m);
 void showBignum(Bignum n);
 void bignumSetIsPrivateKey(Bignum n);
 void deleteBignum(Bignum n);
+uint64 *getBignumData(Bignum n);
 
 // PRNG random number generaor
 void initRandomModule(void);

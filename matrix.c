@@ -183,6 +183,19 @@ static inline int getBit(Matrix M, int row, int col)
     return (M->data[row*numWords + word] >> bit) & 1;
 }
 
+static void setRow(Matrix A, int row, Bignum n)
+{
+    memcpy(A->data + row*numWords, getBignumData(n), numWords*sizeof(uint64));
+}
+
+static Bignum getRow(Matrix A, int row)
+{
+    Bignum n = createBignum(0, N);
+
+    memcpy(getBignumData(n), A->data + row*numWords, numWords*sizeof(uint64));
+    return n;
+}
+
 Bignum getMatrixColumn(Matrix A, int column)
 {
     Bignum n = createBignum(0, N);
@@ -239,7 +252,7 @@ void showMatrixInHex(Matrix M)
     int row, word;
     uint64 *p = M->data;
 
-    printf("uint64 A%d_data[%d] = {\n", N, N*numWords);
+    printf("uint64 G%d_data[%d] = {\n", N, N*numWords);
     for(row = 0; row < N; row++) {
         for(word = 0; word < numWords; word++) {
             if(word != 0) {
@@ -381,6 +394,35 @@ Matrix matrixMultiply(Matrix A, Matrix B)
     return res;
 }
 
+// Xor the source row data onto the dest row data.
+static void xorRowData(
+    uint64 *sourceRow,
+    uint64 *destRow)
+{
+    int i;
+
+    for(i = 0; i < numWords; i++) {
+        *destRow |= *sourceRow;
+    }
+}
+
+// Multiply a vector on the left by a matrix on the right.
+Bignum vectorMultiplyMatrix(Bignum v, Matrix A)
+{
+    Bignum res = createBignum(0, getBignumSize(v));
+    int row;
+    uint64 *resData = getBignumData(res);
+    uint64 *AData = A->data;
+
+    for(row = 0; row < N; row++) {
+        if(getBignumBit(v, row)) {
+            xorRowData(AData, resData);
+        }
+        AData += numWords;
+    }
+    return res;
+}
+
 // Multiply a matrix by a Bignum vector.  We assum it's vertical and on the right.
 Bignum matrixMultiplyVector(Matrix A, Bignum n)
 {
@@ -478,6 +520,45 @@ static bool isSingular(Matrix M)
         }
     }
     return false;
+}
+
+// Matrix inverse with basic Gaussian elimination.
+// Start with A and I, and do Gaussian elimination to convert A to I,
+// while doing the same operations to the other matrix.
+Matrix inverse(Matrix M)
+{
+    Matrix I = identity();
+    Matrix A = copy(M);
+    int row, lowerRow, upperRow;
+
+    // Do the row additions to zero out lower left of A
+    for(row = 0; row < N; row++) {
+        if(!getBit(A, row, row)) {
+            lowerRow = findNonZeroRow(A, row);
+            if(lowerRow == -1) {
+                printf("Matrix is singular\n");
+                return NULL;
+            }
+            xorRow(A, lowerRow, row);
+            xorRow(I, lowerRow, row);
+        }
+        for(lowerRow = row + 1; lowerRow < N; row++) {
+            if(getBit(A, lowerRow, row)) {
+                xorRow(A, row, lowerRow);
+                xorRow(I, row, lowerRow);
+            }
+        }
+    }
+    // Do the same thing to zero the upper part
+    for(row = N - 1; row >= 0; row--) {
+        for(upperRow = 0; upperRow < row; upperRow++) {
+            if(getBit(A, upperRow, row)) {
+                xorRow(A, row, upperRow);
+                xorRow(I, row, upperRow);
+            }
+        }
+    }
+    return I;
 }
     
 // Create a random Boolean matrix.
@@ -721,4 +802,35 @@ void initMatrixModule(int width)
     setWidth(width);
     initParityTable();
     initQueue();
+}
+
+// Reconstruct the user's matrix from his published first row.  We use the
+// fact that the user's matrix H is communitive with G, HG = GH.  We know G, and
+// the first row of H, called h.  Let's call the first row of G g.  hG == gH.
+// We can compute hG, and restrict values of unknowns in H with these N linear
+// equations.  Repeat this with G^2, G^3, ... until we have N - 1 linearly
+// independent equations.  Then, solve for H.
+Matrix reconstructMatrix(Matrix G, Bignum h)
+{
+    Matrix H = zero();
+    Matrix R = zero(); // We will store various values of g here
+    Matrix L = zero(); // We will store various values of gH (computed as hG) here
+    Matrix M = copy(G);
+    Bignum g, v;
+    int i = 1;
+
+    setRow(H, 0, h);
+    setRow(R, 0, h);
+    setRow(L, 0, createBignum(1, N));
+    while(i < N) {
+        g = getRow(M, 0);
+        v = vectorMultiplyMatrix(g, M);
+        //if(linearlyIndependent(H, i, v)) {
+            setRow(L, i, h);
+            setRow(R, i, v);
+            i++;
+            M = matrixMultiply(M, G);
+        //}
+    }
+    return matrixMultiply(L, inverse(R));
 }

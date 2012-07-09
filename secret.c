@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bmat.h"
-#include "A127.h"
-#include "A521.h"
-#include "A607.h"
+#include "generators.h"
 
 int main(int argc, char **argv)
 {
@@ -21,15 +19,7 @@ int main(int argc, char **argv)
         printf("Keys are not the same size, and can not be used together.\n");
         return 1;
     }
-    initMatrixModule(N);
-    switch(N) {
-    case 127: A = createMatrix(A127_data); break;
-    case 521: A = createMatrix(A521_data); break;
-    case 607: A = createMatrix(A607_data); break;
-    default:
-        printf("Unsupported key length %d\n", N);
-        return 1;
-    }
+    A = getGenerator(N);
     A = matrixPow(A, myPriv);
     sharedKey = matrixMultiplyVector(A, theirPub);
     showBignum(sharedKey);

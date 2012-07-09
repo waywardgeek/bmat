@@ -177,3 +177,8 @@ void bignumSetIsPrivateKey(Bignum n)
 {
     n->isPrivate = true;
 }
+
+uint64 *getBignumData(Bignum n)
+{
+    return n->data;
+}
