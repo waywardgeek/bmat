@@ -7,7 +7,7 @@
 static int N; // Width of matrices.
 static int numWords; // How many uint64 words are in each row.
 
-static Matrix firstFreeMatrix = NULL; // I'll maintain a free list of matricies.
+static Matrix firstFreeMatrix; // I'll maintain a free list of matricies.
 
 // This table is for computing the parity of bits of 16-bit ints.
 byte parityTable[1 << 16];
@@ -16,7 +16,7 @@ byte parityTable[1 << 16];
 // allocate a matrix permanently, call copy.
 #define QUEUE_LEN 256
 static Matrix matrixQueue[QUEUE_LEN];
-static int queuePos = 0;
+static int queuePos;
 
 // Structure definitions
 struct MatrixStruct {
@@ -35,7 +35,7 @@ int getMatrixSize(void)
     return N;
 }
 
-static void setWidth(int width)
+void setMatrixWidth(int width)
 {
     N = width;
     numWords = (N + 63)/64;
@@ -65,6 +65,9 @@ static HashTable createHashTable(unsigned size)
 {
     HashTable table = (HashTable)calloc(1, sizeof(struct HashTableStruct));
 
+    if(size > 0x1000000) {
+        size = 0x1000000; // Fails in Windows7 in cygwin otherwise
+    }
     table->size = size;
     table->matrices = (Matrix *)calloc(size, sizeof(Matrix));
     return table;
@@ -654,14 +657,13 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
     uint64 numSteps = (uint64)(maxCycle/stepSize);
     Matrix K = allocateMatrix(matrixPow(A, createBignum(stepSize, 64)));
     Matrix M = K;
-    Matrix otherM, Atran;
+    Matrix otherM;
     HashTable hashTable = createHashTable(numSteps);
     uint64 i, power, lowestPower;
     bool foundCollision = false;
     bool foundHit = false;
 
     A = allocateMatrix(A);
-    Atran = allocateMatrix(transpose(A));
     //printf("populating hash table\n");
     for(i = 0; i < numSteps && !foundCollision; i++) {
         M->power = (i+1)*stepSize;
@@ -698,7 +700,7 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
         }
         //printf("i is %d\n", i);
         //show(M);
-        M = multiplyTransposed(M, Atran);
+        M = matrixMultiply(M, A);
     }
     if(!foundHit) {
         printf("Looks like no loops below %lld\n", maxCycle);
@@ -709,7 +711,6 @@ static uint64 findCycleLength(Matrix A, uint64 maxCycle)
         //show(matrixPow(A, lowestPower));
     }
     deleteMatrix(A);
-    deleteMatrix(Atran);
     deleteMatrix(K);
     delHashTable(hashTable);
     return lowestPower;
@@ -720,7 +721,7 @@ void powTest(void)
     Matrix A, Am, An, key1M, key2M;
     Bignum m, n, key1V, key2V;
 
-    initRandomModule();
+    initRandomModule(false);
     A = allocateMatrix(randomGoodMatrix());
     m = createBignum(randomUint64(), N);
     n = createBignum(randomUint64(), N);
@@ -769,26 +770,30 @@ static uint64 simpleFindCycleLength(Matrix A, long long maxCycle)
 }
 
 // max order matrix, then test passes for N.
-static bool checkPrimeOrderTheory(void)
+bool checkPrimeOrderTheory(void)
 {
     Matrix A;
-    uint64 i, order;
-    uint64 passes = 0;
+    uint64 order;
+    int passes = 0;
+    int i;
 
     for(i = 0; i < 1000; i++) {
         A = randomNonSingularMatrix();
         A = allocateMatrix(A);
         if(hasGoodPowerOrder(A)) {
             order = findCycleLength(A, 1LL << (N + 1));
-            if(order != (1 << N) - 1) {
+            printf("Found order of a good matrix: %lld (total %d generated)\n", order, i);
+            if(order != (1LL << N) - 1) {
                 deleteMatrix(A);
+                printf("Fails for order %d after %d matrices pass.  Total generated was %d\n",
+                    N, passes, i+1);
                 return false;
             }
             passes++;
-            printf("Passed %lld times.\n", passes);
         }
         deleteMatrix(A);
     }
+    printf("Passed for order %d %d times.  Total generated was %d\n", N, passes, i);
     return true;
 }
 
@@ -800,11 +805,14 @@ static void initQueue(void)
     for(i = 0; i < QUEUE_LEN; i++) {
         matrixQueue[i] = allocateMatrix(NULL);
     }
+    queuePos = 0;
 }
 
 void initMatrixModule(int width)
 {
-    setWidth(width);
+    // TODO: if this is called twice, free matrix memory
+    firstFreeMatrix = NULL;
+    setMatrixWidth(width);
     initParityTable();
     initQueue();
 }

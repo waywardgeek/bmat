@@ -34,6 +34,7 @@ void deleteMatrix(Matrix M);
 void powTest(void);
 Matrix allocateMatrix(Matrix oldM);
 Matrix reconstructMatrix(Matrix G, Bignum h);
+bool checkPrimeOrderTheory(void);
 extern byte parityTable[1 << 16];
 
 // Bignum interface
@@ -53,7 +54,7 @@ void deleteBignum(Bignum n);
 uint64 *getBignumData(Bignum n);
 
 // PRNG random number generaor
-void initRandomModule(void);
+void initRandomModule(bool randomize);
 byte randomByte(void);
 bool randomBool(void);
 uint64 randomUint64(void);

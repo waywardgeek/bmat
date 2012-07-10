@@ -70,6 +70,18 @@ Here's the key exchange algorithm...
 
 They then use this key to talk using AES or some other shared-private-key algorithm.
 
+Reconstruction of the entire matrix is pretty fast.  The slow part is actually
+computing the power afterwards.  Alice reconstructs Bob's entire matrix H=G^n by
+noting that H*G^k = G^K*H for all k.  We have he first row of H, called h, and
+the entire matrix G^k, including it's first row gk.  We use the following to
+create linear equations restricting the values in H:
+
+    h*G^k == gk*H
+
+The left side we compute directly.  The right side creates N constraits on
+values of H.  We do this N times, for k=1, 2, ..., N.  Then we just solve the
+linear system of equations for H.
+
 This can also be used for in public key encryption, where anyone can send
 encrypted documents to Bob anonymously, and only Bob can decrypt them.  However,
 it does not seem to offer a simple way for Bob to sign documents.  To send an
@@ -85,3 +97,9 @@ These are the exponents of Mersenne primes, which are primes of the form 2^N -
 1.  Second, only accept non-singular random matrices with no eigenvectors,
 meaning G + I is also non-singular.  Finally, require that the sequence G, G^2,
 G^4, ... G(2^(N-1)) have unique values and that G^(2^N) == G.
+
+The checkmatrix tool verified that up to N=40, the if N is not a Mersenne prime
+exponent, then there are matrices that pass all the other tests, but are not
+primitive generators of groups of order 2^N - 1.  No such matrix has been found
+by the tool for any Mersenne prime exponent.  Many thousands of generators were
+found for 31 and lower with no counter examples.

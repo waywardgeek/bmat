@@ -117,8 +117,10 @@ static void writeRandomData(char *fileName)
     fclose(file);
 }
 
-void initRandomModule(void)
+void initRandomModule(
+    bool randomize)
 {
+    FILE *randFile = NULL;
     char password[1024];
     byte c;
     int i;
@@ -127,11 +129,21 @@ void initRandomModule(void)
         return;  // Already initilaized;
     }
     readRandomData("random.bin");
+    if(randomize) {
+        randFile = fopen("/dev/urandom", "r");
+    }
     for(i = 0; i < sizeof(password); i++) {
         do {
-            c = randomByte();
+            if(randomize) {
+                c = getc(randFile);
+            } else {
+                c = randomByte();
+            }
         } while(c == '\0');
         password[i] = c;
+    }
+    if(randomize) {
+        fclose(randFile);
     }
     password[sizeof(password) - 1] = '\0';
     initKey(password, NULL, 0);

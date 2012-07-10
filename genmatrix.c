@@ -17,7 +17,7 @@ int main(int argc, char **argv)
         return 1;
     }
     initMatrixModule(N);
-    initRandomModule();
+    initRandomModule(true);
     G = randomGoodMatrix();
     showMatrixInHex(G);
     return 0;
