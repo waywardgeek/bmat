@@ -72,7 +72,7 @@ They then use this key to talk using AES or some other shared-private-key algori
 
 Reconstruction of the entire matrix is pretty fast.  The slow part is actually
 computing the power afterwards.  Alice reconstructs Bob's entire matrix H=G^n by
-noting that H*G^k = G^k*H for all k.  We have he first row of H, called h, and
+noting that H*G^k = G^k*H for all k.  We have the first row of H, called h, and
 the entire matrix G^k, including it's first row gk.  We use the following to
 create linear equations restricting the values in H:
 
