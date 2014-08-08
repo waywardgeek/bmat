@@ -10,9 +10,9 @@ Let G be an NxN random "Boolean matrix".  For example, we could choose G =
 In this case N = 4.  A required property of G is that no two rows be equal to
 the XOR-sum of any other rows.  For example, this matrix does not work:
 
-1 1 0
-0 1 1
-1 0 1
+        1 1 0
+        0 1 1
+        1 0 1
 
 because the first row XOR-ed with the second row equals the third row.  Over
 1/5th of all random Boolean matrices had the required property, which is called
@@ -23,14 +23,14 @@ multiplication.  To compute the result in the i-th row, and j-th column, you
 take the i-th row of A and multiply it with the j-th column of B.  It looks
 like:
 
-    res[i][j] = A[i][0]*B[0][j] + A[i][1]*B[1][j] + ... + A[i][N-1]*B[N-1][j]
+        res[i][j] = A[i][0]*B[0][j] + A[i][1]*B[1][j] + ... + A[i][N-1]*B[N-1][j]
 
 Here, I use * to mean the AND operation and + to mean XOR.  Also, you can
 multiply a matrix times a vertical vector, and it usually looks like:
 
-1   1 0 1   1
-0 = 1 1 0 * 1
-1   0 1 0   0
+        1   1 0 1   1
+        0 = 1 1 0 * 1
+        1   0 1 0   0
 
 In my head, I take the vector on the right, rotate it 90 degrees
 counter-clockwise, and AND it on the top row of the matrix.  This results in 1 0
@@ -42,17 +42,17 @@ Now that we have these operations, I can define G^m = G*G*G*G... m times.  It
 turns out that if we choose G correctly, then G^m will not be equal to G unless
 m == 2^N:
 
-    G^m == G implies m = 2^N
+            G^m == G implies m = 2^N
 
 So, for example, if N is 127, then we can keep multiplying m by G over and over
 for 2^127 - 1 times before the result is converted back into m.  Let's also
 define a simple vertical N-bit vector called O (for One), that has 1 at the
 top and the rest 0.  For example O could be:
 
-1
-0
-0
-0
+        1
+        0
+        0
+        0
 
 Here's the key exchange algorithm...
 
@@ -76,7 +76,7 @@ noting that H*G^k = G^K*H for all k.  We have he first row of H, called h, and
 the entire matrix G^k, including it's first row gk.  We use the following to
 create linear equations restricting the values in H:
 
-    h*G^k == gk*H
+        h*G^k == gk*H
 
 The left side we compute directly.  The right side creates N constraits on
 values of H.  We do this N times, for k=1, 2, ..., N.  Then we just solve the
