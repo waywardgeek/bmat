@@ -2,10 +2,10 @@ Here's a key exchange scheme I've come up with.
 
 Let G be an NxN random "Boolean matrix".  For example, we could choose G =
 
-''1 1 0 0 
-1 0 0 1 
-0 1 1 1 
-1 1 0 1''
+        1 1 0 0 
+        1 0 0 1 
+        0 1 1 1 
+        1 1 0 1
 
 In this case N = 4.  A required property of G is that no two rows be equal to
 the XOR-sum of any other rows.  For example, this matrix does not work:
