@@ -178,6 +178,46 @@ class Matrix:
                     return m
 
     @staticmethod
+    def randomCompanionMatrix(size):
+        """Create a random non-singular Boolean matrix."""
+        m = Matrix.zero(size, size)
+        for row in range(size):
+            if row == 0:
+                m[0][size-1] = True
+            else:
+                m[row][row-1] = True
+                m[row][size-1] = random.random() < 0.5
+        a = m + Matrix.identity(size)
+        if a.isSingular():
+            print "Companion matrix is has fixed points"
+        return m
+
+    @staticmethod
+    def minCompanionMatrix(size, pos):
+        """Create a random non-singular Boolean matrix."""
+        m = Matrix.zero(size, size)
+        m[0][pos] = True
+        m[0][size-1] = True
+        for row in range(1, size):
+            m[row][row - 1] = True
+        a = m + Matrix.identity(size)
+        if a.isSingular():
+            print "Companion matrix is has fixed points"
+        return m
+
+    @staticmethod
+    def maxCompanionMatrix(size):
+        m = Matrix.zero(size, size)
+        for col in range(size):
+            m[0][col] = True
+        for row in range(1, size):
+            m[row][row - 1] = True
+        a = m + Matrix.identity(size)
+        if a.isSingular():
+            print "Companion matrix is has fixed points"
+        return m
+
+    @staticmethod
     def randomMatrix(rows, cols, odds=0.5):
         """Create a random Boolean matrix."""
         m = Matrix.zero(rows, cols)
@@ -215,6 +255,30 @@ class Matrix:
         for i in range(self.rows):
             l.append(tuple(self[i]))
         return tuple(l)
+
+    def count1s(self):
+        num1s = 0;
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self[row][col]:
+                    num1s += 1
+        return num1s
+
+    def findNumCommutativeMatrices(self):
+        self.show("Matrices commuting with")
+        numCommutative = 0
+        M = Matrix.zero(self.rows, self.cols)
+        for i in range(2**(self.rows*self.cols)):
+            val = i
+            for row in range(self.rows):
+                for col in range(self.cols):
+                    M[row][col] = (val & 1 == 1)
+                    val >>= 1
+            if A*M == M*A:
+                numCommutative += 1
+                M.show()
+                print
+        return numCommutative
 
 class Equ:
     """This class represents a class of Boolean equations written in XOR/AND
@@ -392,6 +456,11 @@ def findPowerLength(A):
         powers[M.toTuple()] = M
         i += 1
 
+def one(size):
+    O = Matrix.zero(size, 1)
+    O[0][0] = True
+    return O
+
 def findOLength(A):
     i = 1
     O = Matrix.zero(A.rows, 1)
@@ -491,14 +560,47 @@ def findRandMaxOrderMatrix(size):
 #        if length != permLength:
 
 # Find the order of the power group of A
-for N in range(2, 15):
-    print "Testing N =", N
-    worked = True
-    for i in range(50):
-        A = Matrix.randomNonSingularMatrix(N)
-        #A = findRandMaxOrderMatrix(N)
-        permLength = findPermLength(A)
-        powerLength = findPowerLength(A)
-        if powerLength == N and permLength != (1 << N) -1:
-            worked = False
-    print "For size", N, worked
+#for N in range(2, 15):
+#    print "Testing N =", N
+#    worked = True
+#    for i in range(50):
+#        A = Matrix.randomNonSingularMatrix(N)
+#        #A = findRandMaxOrderMatrix(N)
+#        permLength = findPermLength(A)
+#        powerLength = findPowerLength(A)
+#        if powerLength == N and permLength != (1 << N) -1:
+#            worked = False
+#    print "For size", N, worked
+
+#maxA = None
+#min1s = 10000
+#maxOLength = 0
+#for i in range(100):
+#    A = Matrix.randomCompanionMatrix(13)
+#    oLength = findOLength(A)
+#    print "Perm length", findPermLength(A)
+#    print "O length", oLength
+#    num1s = A.count1s()
+#    if oLength > maxOLength or (oLength == maxOLength and num1s < min1s):
+#        maxA = A
+#        maxOLength = oLength
+#        min1s = num1s
+#
+#maxA.show()
+
+for size in range(2, 13):
+    for pos in range(size-1):
+        A = Matrix.minCompanionMatrix(size, pos)
+        #A = Matrix.maxCompanionMatrix(size)
+        print "Size", size
+        A.show()
+        #print "Perm length", findPermLength(A)
+        print "O length", findOLength(A)
+
+#for size in range(2, 10):
+#    for pos in range(size-1):
+#        A = Matrix.minCompanionMatrix(size, pos)
+#        print "Size", size
+#        A.show()
+#        numCommutative = A.findNumCommutativeMatrices()
+#        print "Num commutative", numCommutative
